@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -8,16 +8,25 @@ export default function Home() {
       </h1>
 
       <p className="text-lg md:text-xl text-slate-300 max-w-xl text-center mb-8">
-        Insightful dashboards for local businesses — powered by customer reviews, 
+        Insightful dashboards for local businesses — powered by customer reviews,
         POS data, and actionable metrics. Launching soon.
       </p>
 
-      <a
-        href="mailto:hello@localpulsehq.com"
-        className="px-5 py-3 rounded-lg border border-slate-600 hover:bg-slate-800 transition"
-      >
-        Contact Us
-      </a>
+      <div className="mt-6 flex gap-3">
+        <a
+          href="mailto:hello@localpulsehq.com"
+          className="px-5 py-3 rounded-lg border border-slate-600 hover:bg-slate-800 transition text-sm"
+        >
+          Contact Us
+        </a>
+
+        <Link
+          href="/login"
+          className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 transition text-sm font-medium"
+        >
+          Log In
+        </Link>
+      </div>
     </main>
   );
 }
