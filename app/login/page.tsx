@@ -17,15 +17,19 @@ export default function LoginPage() {
     setMessage(null);
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password });
+      // 1) create the user in supabase auth
+      const { data, error } = await supabase.auth.signUp({ email, password });
 
       if (error) {
         setMessage(error.message);
-      } else {
-        // after sign up send to dashboard for now 
-        router.push('/dashboard')
+        return;
       }
-      //setMessage(error ? error.message : 'Check your email to confirm your account.');
+
+      // with email confirmation ON, supabase will send a verification link.
+      // The DB trigger will create the profile + cafe whenevr the user is created.
+      setMessage('Check your email to confirm your account');
+      
+      return; 
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
