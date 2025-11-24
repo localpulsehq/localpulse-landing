@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import "@/app/globals.css"
+import { ToastProvider } from "@/components/ui/toast";
 
 type CafeRow = {
   name: string;
@@ -12,9 +14,12 @@ type CafeRow = {
 const navItems = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/reviews', label: 'Reviews' },
+  { href: '/dashboard/sales-analytics', label: 'Analytics' }, 
   { href: '/dashboard/sales', label: 'Sales' },
   { href: '/dashboard/settings', label: 'Settings' },
 ];
+
+
 
 export default function DashboardLayout({
   children,
@@ -135,6 +140,29 @@ export default function DashboardLayout({
             </button>
           </div>
         </header>
+
+        {/* Mobile nav (under header) */}
+        <nav className="md:hidden border-b border-slate-800 bg-slate-950/95 px-3 py-2 overflow-x-auto">
+          <div className="flex gap-2">
+            {navItems.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={[
+                    "whitespace-nowrap rounded-full px-3 py-1 text-[11px] transition-colors",
+                    active
+                      ? "bg-sky-600 text-slate-50"
+                      : "bg-slate-900 text-slate-300 hover:bg-slate-800",
+                  ].join(" ")}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
 
         {/* Page content */}
         <main className="flex-1 px-4 md:px-6 py-6">

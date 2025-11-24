@@ -24,3 +24,150 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer utilities {
+  /* Card fade-in / slide-up */
+  @keyframes card-in {
+    0% {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-card-in {
+    animation: card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Fade in */
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.35s ease-out forwards;
+  }
+
+  /* Pop-in (modal) */
+  @keyframes pop-in {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-pop-in {
+    animation: pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Bar grow from bottom */
+  @keyframes bar-grow {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
+  }
+
+  .animate-bar-grow {
+    transform-origin: bottom;
+    animation: bar-grow 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Skeleton shimmer */
+  @keyframes shimmer {
+    0% {
+      background-position: -400px 0;
+    }
+    100% {
+      background-position: 400px 0;
+    }
+  }
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(15 23 42); /* slate-900 */
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0) 0%,
+      rgba(148, 163, 184, 0.25) 50%,
+      rgba(148, 163, 184, 0) 100%
+    );
+    background-size: 400px 100%;
+    animation: shimmer 1.2s infinite;
+  }
+}
+
+/* --- Card entry animations --- */
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-card-in {
+  animation: card-in 0.35s ease-out forwards;
+}
+
+.animate-card-slide-up {
+  animation: card-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-card-scale-in {
+  animation: card-scale-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* --- Shimmer overlay for "glass" cards --- */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s ease-in-out infinite;
+}
