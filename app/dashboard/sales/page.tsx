@@ -66,9 +66,31 @@ export default function SalesPage() {
   const [newRows, setNewRows] = useState<NewSalesRow[]>([makeEmptyRow()]);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // ---------- CSV helpers ----------
+  function escapeCsv(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
 
-  // ---------- helpers ----------
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
 
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
+
+// ---------- helpers ----------
   function resetForm() {
     setSaleDate(new Date().toISOString().slice(0, 10));
     setTotalRevenue('');
@@ -124,6 +146,53 @@ export default function SalesPage() {
     setNewRows(prev => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
   }
 
+  // fetch first page of sales for given cafe and reset pagination state.
+  // used on initial load + after bulk changes
+  async function reloadSales(cafeId: string) {
+    const { data: salesData, error: salesError } = await supabase
+      .from('sales')
+      .select('*')
+      .eq('cafe_id', cafeId)
+      .order('sale_date', {ascending: false})
+      .range(0, PAGE_SIZE-1);
+
+      if (salesError) {
+        console.error('Failed to load sales', salesError);
+        setErrorMessage('Could not load sales data.');
+        return;
+      }
+
+      setSales(salesData ?? []);
+      setPage(0);
+      setHasMore((salesData ?? []).length === PAGE_SIZE);
+  }
+
+  async function loadSalesForCafe(
+    cafeId: string,
+    setSales: (rows: SalesRow[]) => void,
+    setPage: (p: number) => void,
+    setHasMore: (v: boolean) => void,
+    setErrorMessage: (msg: string | null) => void
+  ) {
+    const { data: salesData, error: salesError } = await supabase
+      .from('sales')
+      .select('*')
+      .eq('cafe_id', cafeId)
+      .order('sale_date', { ascending: false })
+      .range(0, PAGE_SIZE - 1);
+
+    if (salesError) {
+      console.error('Failed to load sales:', salesError);
+      setErrorMessage('Could not load sales data.');
+      return;
+    }
+
+    const rows = salesData ?? [];
+    setSales(rows);
+    setPage(0);
+    setHasMore(rows.length === PAGE_SIZE);
+  }
+
   // ---------- initial load ----------
 
   useEffect(() => {
@@ -156,21 +225,13 @@ export default function SalesPage() {
       setCafeId(cafeData.id);
 
       // first page of sales
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select('*')
-        .eq('cafe_id', cafeData.id)
-        .order('sale_date', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
-
-      if (salesError) {
-        console.error('Failed to load sales:', salesError);
-        setErrorMessage('Could not load sales data.');
-      } else {
-        setSales(salesData ?? []);
-        setPage(0);
-        setHasMore((salesData ?? []).length === PAGE_SIZE);
-      }
+      await loadSalesForCafe(
+        cafeData.id,
+        setSales,
+        setPage,
+        setHasMore,
+        setErrorMessage,
+      );
 
       setLoading(false);
     }
@@ -295,47 +356,51 @@ export default function SalesPage() {
 
   // handle add entries
   async function handleAddEntries() {
-  if (!cafeId) return;
-  setSaveError(null);
-  setSaving(true);
+    if (!cafeId) return;
+    setSaveError(null);
+    setSaving(true);
 
-  // Build payload from all rows that have date + totalRevenue
-  const payload = newRows
-    .filter(row => row.saleDate && row.totalRevenue)
-    .map(row => ({
-      cafe_id: cafeId,
-      sale_date: row.saleDate,
-      total_revenue: Number(row.totalRevenue),
-      total_transactions: row.totalTransactions
-        ? Number(row.totalTransactions)
-        : null,
-      cash_revenue: row.cashRevenue ? Number(row.cashRevenue) : null,
-      card_revenue: row.cardRevenue ? Number(row.cardRevenue) : null,
-      notes: row.notes.trim() || null,
-    }));
+    // Build payload from all rows that have date + totalRevenue
+    const payload = newRows
+      .filter(row => row.saleDate && row.totalRevenue)
+      .map(row => ({
+        cafe_id: cafeId,
+        sale_date: row.saleDate,
+        total_revenue: Number(row.totalRevenue),
+        total_transactions: row.totalTransactions
+          ? Number(row.totalTransactions)
+          : null,
+        cash_revenue: row.cashRevenue ? Number(row.cashRevenue) : null,
+        card_revenue: row.cardRevenue ? Number(row.cardRevenue) : null,
+        notes: row.notes.trim() || null,
+      }));
 
-  if (payload.length === 0) {
-    setSaveError('Please fill at least one row with a date and total revenue.');
+    if (payload.length === 0) {
+      setSaveError('Please fill at least one row with a date and total revenue.');
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase.from('sales').insert(payload);
     setSaving(false);
-    return;
-  }
 
-  const { error } = await supabase.from('sales').insert(payload);
-  setSaving(false);
+    if (error) {
+      console.error('Bulk insert failed:', error);
+      setSaveError('Failed to save sales entries.');
+      return;
+    }
 
-  if (error) {
-    console.error('Bulk insert failed:', error);
-    setSaveError('Failed to save sales entries.');
-    return;
-  }
+    // Reset + close
+    setNewRows([makeEmptyRow()]);
+    setShowAddModal(false);
 
-  // Reset + close
-  setNewRows([makeEmptyRow()]);
-  setShowAddModal(false);
-
-  // Refresh table
-  // (you can factor your initial load into a separate function and call it here)
-  // await reloadSales();
+    await loadSalesForCafe(
+      cafeId, 
+      setSales, 
+      setPage, 
+      setHasMore, 
+      setErrorMessage,
+    );
 }
 
   // ---------- delete ----------
@@ -360,12 +425,106 @@ export default function SalesPage() {
     }
   }
 
+  // ---------- export CSV ---------- 
+    async function handleExportCsv() {
+    if (!cafeId) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    // Fetch ALL sales for this cafe (not just current page)
+    const { data, error } = await supabase
+      .from('sales')
+      .select(
+        'sale_date,total_revenue,total_transactions,cash_revenue,card_revenue,notes',
+      )
+      .eq('cafe_id', cafeId)
+      .order('sale_date', { ascending: true });
+
+    if (error) {
+      console.error('Failed to export CSV:', error);
+      setErrorMessage('Could not export sales CSV.');
+      return;
+    }
+
+    const rows = data ?? [];
+
+    if (!rows.length) {
+      setErrorMessage('No sales to export yet.');
+      return;
+    }
+
+    // Header matches the import format
+    const header = [
+      'sale_date',
+      'total_revenue',
+      'total_transactions',
+      'cash_revenue',
+      'card_revenue',
+      'notes',
+    ];
+
+    const lines: string[] = [];
+    lines.push(header.join(','));
+
+    for (const row of rows) {
+      const line = [
+        escapeCsv(row.sale_date),
+        escapeCsv(row.total_revenue),
+        escapeCsv(row.total_transactions),
+        escapeCsv(row.cash_revenue),
+        escapeCsv(row.card_revenue),
+        escapeCsv(row.notes),
+      ].join(',');
+      lines.push(line);
+    }
+
+    const csv = lines.join('\r\n');
+    downloadCsv('localpulse-sales.csv', csv);
+    setSuccessMessage('Sales exported as CSV.');
+    setTimeout(() => setSuccessMessage(null), 2000);
+  }
+
   // ---------- render ----------
 
-  if (loading) {
+  if (loading && !sales.length) {
     return (
-      <section className="border border-slate-800 rounded-xl bg-slate-900/40 p-6">
-        <p className="text-sm text-slate-300">Loading sales…</p>
+      <section className="space-y-4">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-4 w-20 bg-slate-800 rounded animate-pulse" />
+            <div className="h-3 w-56 bg-slate-900 rounded animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-8 w-28 bg-slate-900 rounded-md border border-slate-800 animate-pulse" />
+            <div className="h-8 w-28 bg-slate-900 rounded-md border border-slate-800 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Table card skeleton */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-sm">
+          {/* Table header skeleton */}
+          <div className="h-3 w-32 bg-slate-800 rounded mb-4 animate-pulse" />
+
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1.2fr_repeat(5,0.8fr)] gap-3 text-xs"
+              >
+                <div className="h-3 bg-slate-800/80 rounded animate-pulse" />
+                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
+                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
+                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
+                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
+                <div className="flex justify-end">
+                  <div className="h-6 w-14 bg-slate-900 border border-slate-800 rounded-md animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
     );
   }
@@ -389,6 +548,14 @@ export default function SalesPage() {
             className="px-3 py-1.5 rounded-md border border-slate-600 text-xs font-medium text-slate-100 bg-slate-900 hover:bg-slate-800"
           >
             Import CSV
+        </button>
+        
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          className="px-3 py-1.5 rounded-md border border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-xs font-medium"
+        >
+          Export CSV
         </button>
         </div>
       </div>
@@ -760,11 +927,20 @@ export default function SalesPage() {
       )}
 
       {showImportModal && cafeId && (
-        <ImportCsvModal
-          cafeId={cafeId}
-          onClose={() => setShowImportModal(false)}
-          onUploaded={() => window.location.reload()}
-        />
+       <ImportCsvModal
+        cafeId={cafeId}
+        onClose={() => setShowImportModal(false)}
+        onUploaded={async () => {
+          await loadSalesForCafe(
+            cafeId,
+            setSales,
+            setPage,
+            setHasMore,
+            setErrorMessage,
+          );
+          setShowImportModal(false);
+        }}
+      />
       )}
 
     </section>

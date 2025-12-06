@@ -1,59 +1,60 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { 
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { supabase } from '@/lib/supabaseClient';
-import AnimatedCard from '@/components/ui/AnimatedCard'
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
+import AnimatedCard from '@/components/ui/AnimatedCard';
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { computeSalesInsights, type SalesRow } from '@/lib/analytics/sales';
+import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { SkeletonChart } from '@/components/ui/SkeletonChart';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { 
+  parseDate, toYMD, addDaysSafe, formatShortLabel, weekday 
+} from "@/lib/date";
+import { formatCurrencyAUD } from '@/lib/format';
+import { ENABLE_ANALYTICS_DEBUG } from '@/lib/debug';
+import { DebugPanel } from '@/components/ui/DebugPanel';
 
-
-// ---------- types ---------- 
-
-type SalesRow = {
-  id: string;
-  cafe_id: string;
-  sale_date: string;          // YYYY-MM-DD
-  total_revenue: number;
-  total_transactions: number | null;
-  cash_revenue: number | null;
-  card_revenue: number | null;
-  notes: string;
-};
+// ---------- types ----------
 
 type RangeKey = '7d' | '30d' | '90d' | 'custom';
 
 type DailyPoint = {
   date: string; // 'YYYY-MM-DD'
-  label: string; // 'oct 01'
+  label: string; // 'Oct 01'
   total: number;
   cash: number;
   card: number;
 };
 
+type TopDayView = {
+  id: string;
+  date: string;
+  formattedDate: string;
+  revenue: number;
+  notes: string | null;
+};
+
 // ---------- helpers ----------
 
-function addDays(d: Date, delta: number) {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + delta);
-  return copy;
-}
-
-function formatShortLabel(d: Date) {
-  return d.toLocaleDateString('en-AU', {
-    month: 'short',
-    day: '2-digit',
-  });
-}
-
-function dateToYmd(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 function getRangeDates(range: RangeKey, customFrom?: string, customTo?: string) {
   const today = new Date();
-  const end = new Date(dateToYmd(today)); // strip time
+  const end = new Date(toYMD(today)); // strip time
 
   if (range === 'custom' && customFrom && customTo) {
     return {
@@ -63,22 +64,16 @@ function getRangeDates(range: RangeKey, customFrom?: string, customTo?: string) 
   }
 
   const size =
-    range === '7d'
-      ? 7
-      : range === '30d'
-      ? 30
-      : range === '90d'
-      ? 90
-      : 30;
+    range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 30;
 
-  const start = addDays(end, -size + 1);
+  const start = addDaysSafe(end, -size + 1);
   return { start, end };
 }
 
 function buildDailySeries(
   sales: SalesRow[],
   start: Date,
-  end: Date,
+  end: Date
 ): DailyPoint[] {
   const byDate = new Map<
     string,
@@ -97,8 +92,8 @@ function buildDailySeries(
   }
 
   const days: DailyPoint[] = [];
-  for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-    const ymd = dateToYmd(d);
+  for (let d = new Date(start); d <= end; d = addDaysSafe(d, 1)) {
+    const ymd = toYMD(d);
     const agg = byDate.get(ymd) ?? { total: 0, cash: 0, card: 0 };
 
     days.push({
@@ -117,36 +112,8 @@ function sum(arr: number[]) {
   return arr.reduce((acc, v) => acc + v, 0);
 }
 
-function percentageChange(current: number, previous: number) {
-  if (!previous) return null;
-  return ((current - previous) / previous) * 100;
-}
 
-function formatCurrency(value: number): string {
-  return `A$${value.toLocaleString('en-AU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-AU', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
-function daysAgo(base: Date, n: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() - n);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-// Simple SVG sparkline (same style as overview)
+// Simple SVG sparkline (kept in case you use it later)
 function RevenueSparkline({ values }: { values: number[] }) {
   if (!values.length) return null;
 
@@ -166,7 +133,8 @@ function RevenueSparkline({ values }: { values: number[] }) {
 
   const lastIndex = values.length - 1;
   const lastX = lastIndex * stepX;
-  const lastY = height - 6 - (values[lastIndex] / max) * (height - 16);
+  const lastY =
+    height - 6 - (values[lastIndex] / max) * (height - 16);
 
   return (
     <svg
@@ -229,7 +197,7 @@ function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
 
   return (
     <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/70 border border-slate-800 p-1 text-xs">
-      {options.map(opt => (
+      {options.map((opt) => (
         <button
           key={opt.key}
           type="button"
@@ -251,6 +219,7 @@ function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
 }
 
 // ---------- KPI card helper ----------
+
 type KpiProps = {
   label: string;
   value: number;
@@ -263,7 +232,7 @@ type KpiProps = {
 function KpiCard({
   label,
   value,
-  prefix = 'A$',
+  prefix = 'A',
   changePct,
   changeLabel,
   delay = 0,
@@ -272,9 +241,11 @@ function KpiCard({
 
   return (
     <AnimatedCard delay={delay}>
-      <p className="text-xs font-medium text-slate-400 mb-1">{label}</p>
+      <p className="text-xs font-medium text-slate-400 mb-1">
+        {label}
+      </p>
       <p className="text-2xl font-semibold text-slate-50">
-        <AnimatedNumber value={value} />
+        <AnimatedNumber value={value} prefix={prefix} />
       </p>
       {changePct != null && (
         <p
@@ -300,7 +271,9 @@ export default function SalesAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangeKey>('30d');
   const [sales, setSales] = useState<SalesRow[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    null
+  );
 
   // Load all sales for the logged-in cafe
   useEffect(() => {
@@ -308,7 +281,8 @@ export default function SalesAnalyticsPage() {
       setLoading(true);
       setErrorMessage(null);
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
       if (userError || !userData.user) {
         setErrorMessage('You must be logged in to see analytics.');
         setLoading(false);
@@ -347,7 +321,7 @@ export default function SalesAnalyticsPage() {
     load();
   }, []);
 
-  // Derived analytics based on range
+  // Derived analytics based on range – now powered by computeSalesInsights
   const {
     series,
     totalRevenue,
@@ -370,71 +344,63 @@ export default function SalesAnalyticsPage() {
         cashTotal: 0,
         cardTotal: 0,
         weekdayData: [] as { name: string; total: number }[],
-        topDays: [] as SalesRow[],
+        topDays: [] as TopDayView[],
         periodLabel: '',
       };
     }
 
+    const windowDays: Record<RangeKey, number> = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90,
+      custom: 30, // placeholder; custom not yet active
+    };
+
+    const selectedWindow = windowDays[range];
+    const insights = computeSalesInsights(sales, selectedWindow);
+
+    // Build chart series for the selected date window
     const { start, end } = getRangeDates(range);
-    const daysInRange =
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + 1;
+    const startYmd = toYMD(start);
+    const endYmd = toYMD(end);
 
-    const startYmd = dateToYmd(start);
-    const endYmd = dateToYmd(end);
-
-    const filtered = sales.filter(
-      s => s.sale_date >= startYmd && s.sale_date <= endYmd,
+    const filteredForSeries = sales.filter(
+      (s) => s.sale_date >= startYmd && s.sale_date <= endYmd
     );
 
-    const series = buildDailySeries(filtered, start, end);
+    const series = buildDailySeries(filteredForSeries, start, end);
 
-    const totalRevenue = sum(filtered.map(r => r.total_revenue));
-    const avgDailyRevenue =
-      daysInRange > 0 ? totalRevenue / daysInRange : totalRevenue;
-
-    // previous period (same length immediately before)
-    const prevStart = addDays(start, -daysInRange);
-    const prevEnd = addDays(start, -1);
-
-    const prevFiltered = sales.filter(
-      s =>
-        s.sale_date >= dateToYmd(prevStart) &&
-        s.sale_date <= dateToYmd(prevEnd),
-    );
-    const prevTotalRevenue = sum(prevFiltered.map(r => r.total_revenue));
-    const trendPct = percentageChange(totalRevenue, prevTotalRevenue);
-
-    // cash vs card
-    const cashTotal = sum(filtered.map(r => r.cash_revenue ?? 0));
-    const cardTotal = sum(filtered.map(r => r.card_revenue ?? 0));
-
-    // weekday totals
-    const weekdayTotals = new Array(7).fill(0);
-    for (const row of filtered) {
-      const d = new Date(row.sale_date);
-      const idx = d.getDay();
-      weekdayTotals[idx] += row.total_revenue ?? 0;
+    // Best weekday label, from revenueByWeekday
+    let bestWeekdayLabel: string | null = null;
+    const weekdayTotals = insights.revenueByWeekday ?? [];
+    if (weekdayTotals.length) {
+      let bestIdx = 0;
+      for (let i = 1; i < weekdayTotals.length; i++) {
+        if (weekdayTotals[i] > weekdayTotals[bestIdx]) bestIdx = i;
+      }
+      if (weekdayTotals[bestIdx] > 0) {
+        bestWeekdayLabel = `${WEEKDAYS[bestIdx]}s`;
+      }
     }
 
     const weekdayData = WEEKDAYS.map((name, idx) => ({
       name,
-      total: weekdayTotals[idx],
+      total: insights.revenueByWeekday[idx] ?? 0,
     }));
 
-    // best weekday label
-    let bestWeekdayLabel: string | null = null;
-    if (filtered.length) {
-      let bestIdx = 0;
-      for (let i = 1; i < 7; i++) {
-        if (weekdayTotals[i] > weekdayTotals[bestIdx]) bestIdx = i;
-      }
-      bestWeekdayLabel = `${WEEKDAYS[bestIdx]}s`;
-    }
+    const { cashTotal, cardTotal } = insights.cardCashShare;
 
-    // top days
-    const topDays = [...filtered]
-      .sort((a, b) => b.total_revenue - a.total_revenue)
-      .slice(0, 7);
+    // Top days from insights, re-attached with notes from the original rows
+    const topDays: TopDayView[] = insights.topRevenueDays.map((day) => {
+      const row = sales.find((r) => r.sale_date === day.date);
+      return {
+        id: row?.id ?? day.date,
+        date: day.date,
+        formattedDate: day.formattedDate,
+        revenue: day.revenue,
+        notes: row?.notes ?? null,
+      };
+    });
 
     const periodLabel =
       range === '7d'
@@ -447,10 +413,10 @@ export default function SalesAnalyticsPage() {
 
     return {
       series,
-      totalRevenue,
-      avgDailyRevenue,
+      totalRevenue: insights.totalRevenue,
+      avgDailyRevenue: insights.averageDailyRevenue,
       bestWeekdayLabel,
-      trendPct,
+      trendPct: insights.revenueChangePct,
       cashTotal,
       cardTotal,
       weekdayData,
@@ -467,33 +433,25 @@ export default function SalesAnalyticsPage() {
     return (
       <section className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
-            <div className="h-3 w-64 bg-slate-900 rounded mt-2 animate-pulse" />
-          </div>
+          <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
           <div className="h-8 w-56 bg-slate-900 rounded-full animate-pulse" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 md:p-6 animate-pulse"
-            >
-              <div className="h-3 w-24 bg-slate-800 rounded mb-3" />
-              <div className="h-6 w-32 bg-slate-700 rounded" />
-            </div>
-          ))}
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-4">
-          <div className="h-64 rounded-xl border border-slate-800 bg-slate-900/40 animate-pulse" />
-          <div className="h-64 rounded-xl border border-slate-800 bg-slate-900/40 animate-pulse" />
+          <SkeletonChart height={260} />
+          <SkeletonChart height={260} />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1.7fr] gap-4">
-          <div className="h-64 rounded-xl border border-slate-800 bg-slate-900/40 animate-pulse" />
-          <div className="h-64 rounded-xl border border-slate-800 bg-slate-900/40 animate-pulse" />
+          <SkeletonChart height={240} />
+          <SkeletonChart height={240} />
         </div>
       </section>
     );
@@ -503,38 +461,25 @@ export default function SalesAnalyticsPage() {
 
   if (!hasData) {
     return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Sales analytics</h2>
-            <p className="text-sm text-slate-400">
-              Once you have at least a week of sales, we’ll show richer
-              analytics here.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-center text-sm text-slate-400">
-          Add some sales in the <span className="font-semibold">Sales</span>{' '}
-          tab to unlock analytics like revenue trends, busy days of the week,
-          and cash vs card breakdowns.
-        </div>
-      </section>
+      <EmptyState
+        title="Not enough data yet"
+        description="Add at least a week of sales entries to unlock trend analysis."
+      />
     );
   }
 
   // ---------- chart tooltips ----------
 
-  const CustomLineTooltip = ({ active, payload, label }: any) => {
+  const CustomLineTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const point = payload[0].payload as DailyPoint;
     return (
       <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
         <div className="font-medium mb-1">{point.date}</div>
-        <div>Total: {formatCurrency(point.total)}</div>
+        <div>Total: {formatCurrencyAUD(point.total)}</div>
         <div className="text-slate-400">
-          Cash: {formatCurrency(point.cash)} · Card:{' '}
-          {formatCurrency(point.card)}
+          Cash: {formatCurrencyAUD(point.cash)} · Card:{' '}
+          {formatCurrencyAUD(point.card)}
         </div>
       </div>
     );
@@ -546,19 +491,17 @@ export default function SalesAnalyticsPage() {
   ];
 
   const avgForPeriod =
-    series.length > 0
-      ? sum(series.map(p => p.total)) / series.length
-      : 0;
+    series.length > 0 ? sum(series.map((p) => p.total)) / series.length : 0;
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 md:space-y-6">
       {/* header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Sales analytics</h2>
           <p className="text-sm text-slate-400">
-            See how your café is performing over time, which days are busiest,
-            and how guests are paying.
+            See how your café is performing over time, which days are
+            busiest, and how guests are paying.
           </p>
         </div>
 
@@ -566,7 +509,7 @@ export default function SalesAnalyticsPage() {
       </div>
 
       {/* KPI grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
           label={`Revenue (${periodLabel})`}
           value={totalRevenue}
@@ -604,7 +547,7 @@ export default function SalesAnalyticsPage() {
               {cardTotal + cashTotal === 0
                 ? '—'
                 : `${Math.round(
-                    (cardTotal / (cardTotal + cashTotal)) * 100,
+                    (cardTotal / (cardTotal + cashTotal)) * 100
                   )}%`}
             </span>{' '}
             · Cash:{' '}
@@ -612,7 +555,7 @@ export default function SalesAnalyticsPage() {
               {cardTotal + cashTotal === 0
                 ? '—'
                 : `${Math.round(
-                    (cashTotal / (cardTotal + cashTotal)) * 100,
+                    (cashTotal / (cardTotal + cashTotal)) * 100
                   )}%`}
             </span>
           </p>
@@ -628,7 +571,7 @@ export default function SalesAnalyticsPage() {
           <p className="text-xs font-medium text-slate-400 mb-2">
             Revenue over time
           </p>
-          <div className="h-56 sm:5-64">
+          <div className="h-56 sm:h-60 lg:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={series}>
                 <defs>
@@ -662,7 +605,7 @@ export default function SalesAnalyticsPage() {
                   axisLine={false}
                   tickLine={false}
                   width={60}
-                  tickFormatter={v =>
+                  tickFormatter={(v) =>
                     v >= 1000 ? `${Math.round(v / 1000)}k` : v
                   }
                 />
@@ -686,7 +629,7 @@ export default function SalesAnalyticsPage() {
           <p className="text-xs font-medium text-slate-400 mb-2">
             Cash vs card revenue
           </p>
-          <div className="h-64 flex items-center justify-center">
+          <div className="h-56 sm:h-64 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -706,8 +649,10 @@ export default function SalesAnalyticsPage() {
                     const p = payload[0];
                     return (
                       <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
-                        <div className="font-medium mb-1">{p.name}</div>
-                        <div>{formatCurrency(p.value ?? 0)}</div>
+                        <div className="font-medium mb-1">
+                          {p.name}
+                        </div>
+                        <div>{formatCurrencyAUD(p.value ?? 0)}</div>
                       </div>
                     );
                   }}
@@ -727,7 +672,7 @@ export default function SalesAnalyticsPage() {
           <p className="text-xs font-medium text-slate-400 mb-2">
             Revenue by weekday
           </p>
-          <div className="h-64">
+          <div className="h-56 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekdayData}>
                 <CartesianGrid
@@ -746,7 +691,7 @@ export default function SalesAnalyticsPage() {
                   axisLine={false}
                   tickLine={false}
                   width={60}
-                  tickFormatter={v =>
+                  tickFormatter={(v) =>
                     v >= 1000 ? `${Math.round(v / 1000)}k` : v
                   }
                 />
@@ -756,13 +701,19 @@ export default function SalesAnalyticsPage() {
                     const p = payload[0];
                     return (
                       <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
-                        <div className="font-medium mb-1">{p.payload.name}</div>
-                        <div>{formatCurrency(p.value ?? 0)}</div>
+                        <div className="font-medium mb-1">
+                          {p.payload.name}
+                        </div>
+                        <div>{formatCurrencyAUD(p.value ?? 0)}</div>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]} fill={CHART_COLORS.bars} />
+                <Bar
+                  dataKey="total"
+                  radius={[4, 4, 0, 0]}
+                  fill={CHART_COLORS.bars}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -781,43 +732,46 @@ export default function SalesAnalyticsPage() {
                 <tr className="text-slate-400 border-b border-slate-800">
                   <th className="py-2 pr-4">Date</th>
                   <th className="py-2 pr-4">Revenue</th>
-                  <th className="py-2 pr-4">vs daily avg</th>
-                  <th className="py-2 pr-4">Notes</th>
+                  <th className="py-2 pr-4 hidden sm:table-cell">vs daily avg</th>
+                  <th className="py-2 pr-4 hidden md:table-cell">Notes</th>
                 </tr>
               </thead>
               <tbody>
-                {topDays.map(row => {
-                  const diff = row.total_revenue - avgForPeriod;
+                {topDays.map((day) => {
+                  const diff = day.revenue - avgForPeriod;
                   const pct =
                     avgForPeriod > 0 ? (diff / avgForPeriod) * 100 : null;
                   const positive = (pct ?? 0) >= 0;
 
                   return (
                     <tr
-                      key={row.id}
+                      key={day.id}
                       className="border-b border-slate-900 last:border-0"
                     >
                       <td className="py-2 pr-4 whitespace-nowrap text-slate-200">
-                        {row.sale_date}
+                        {day.formattedDate}
                       </td>
                       <td className="py-2 pr-4 text-slate-50">
-                        {formatCurrency(row.total_revenue)}
+                        {formatCurrencyAUD(day.revenue)}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td className="py-2 pr-4 hidden sm:table-cell">
                         {pct == null ? (
                           '—'
                         ) : (
                           <span
                             className={
-                              positive ? 'text-emerald-400' : 'text-rose-400'
+                              positive
+                                ? 'text-emerald-400'
+                                : 'text-rose-400'
                             }
                           >
-                            {positive ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
+                            {positive ? '▲' : '▼'}{' '}
+                            {Math.abs(pct).toFixed(1)}%
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-4 max-w-xs truncate text-slate-400">
-                        {row.notes ?? '—'}
+                      <td className="py-2 pr-4 max-w-xs truncate text-slate-400 hidden md:table-cell">
+                        {day.notes ?? '—'}
                       </td>
                     </tr>
                   );
@@ -826,14 +780,32 @@ export default function SalesAnalyticsPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-slate-500">
-            Use this to remember what was happening on standout days (weather,
-            events, promos, etc.).
+            Use this to remember what was happening on standout days
+            (weather, events, promos, etc.).
           </p>
         </AnimatedCard>
       </div>
 
       {errorMessage && (
         <p className="text-xs text-rose-400 mt-2">{errorMessage}</p>
+      )}
+
+      {ENABLE_ANALYTICS_DEBUG && (
+        <DebugPanel
+          title="Sales analytics debug"
+          data={{
+            range,
+            salesCount: sales.length,
+            totalRevenue,
+            avgDailyRevenue,
+            trendPct,
+            cashTotal,
+            cardTotal,
+            weekdayData,
+            series,
+            topDays,
+          }}
+        />
       )}
     </section>
   );

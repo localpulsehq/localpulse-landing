@@ -1,46 +1,39 @@
 'use client';
 
-import AnimatedCard, { AnimatedCardGroup } from '@/components/ui/AnimatedCard';
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
-import { useCountUp } from '@/hooks/useCountUp';
 import { useEffect, useState } from 'react';
+import AnimatedCard, {
+  AnimatedCardGroup,
+} from '@/components/ui/AnimatedCard';
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { supabase } from '@/lib/supabaseClient';
+import {
+  computeSalesInsights,
+  type SalesRow,
+} from '@/lib/analytics/sales';
+import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { SkeletonChart } from '@/components/ui/SkeletonChart';
+import { parseDate, formatDateAU } from '@/lib/date';
+import { ENABLE_ANALYTICS_DEBUG } from '@/lib/debug';
+import { DebugPanel } from '@/components/ui/DebugPanel';
 
-type DailyRevenue = {
-  date: string; // YYYY-MM-DD
-  total: number;
-};
-
-function formatCurrency(value: number): string {
-  return `A$${value.toLocaleString('en-AU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
+// ---------- helpers ----------
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-AU', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
+  return formatDateAU(dateStr);
 }
 
-function calcChange(current: number, previous: number): number | null {
-  if (previous <= 0) return null;
-  return ((current - previous) / previous) * 100;
-}
-
-function TrendLabel({ change, label }: { change: number | null; label: string }) {
+function TrendLabel({
+  change,
+  label,
+}: {
+  change: number | null;
+  label: string;
+}) {
   if (change === null) {
-    return (
-      <span className="text-xs text-slate-400">
-        — {label}
-      </span>
-    );
+    return <span className="text-xs text-slate-400">— {label}</span>;
   }
 
   const isUp = change >= 0;
@@ -60,6 +53,7 @@ function TrendLabel({ change, label }: { change: number | null; label: string })
   );
 }
 
+// Simple sparkline SVG (same as before)
 function RevenueSparkline({ values }: { values: number[] }) {
   if (!values.length) return null;
 
@@ -72,14 +66,15 @@ function RevenueSparkline({ values }: { values: number[] }) {
     .map((v, i) => {
       const x = i * stepX;
       const normalized = v / max;
-      const y = height - 6 - normalized * (height - 16); // padding top/bottom
+      const y = height - 6 - normalized * (height - 16); // padding
       return `${x},${y}`;
     })
     .join(' ');
 
   const lastIndex = values.length - 1;
   const lastX = lastIndex * stepX;
-  const lastY = height - 6 - (values[lastIndex] / max) * (height - 16);
+  const lastY =
+    height - 6 - (values[lastIndex] / max) * (height - 16);
 
   return (
     <svg
@@ -87,7 +82,6 @@ function RevenueSparkline({ values }: { values: number[] }) {
       className="w-full h-16 text-sky-500/80"
       aria-hidden="true"
     >
-      {/* baseline */}
       <line
         x1={0}
         y1={height - 6}
@@ -97,8 +91,6 @@ function RevenueSparkline({ values }: { values: number[] }) {
         strokeWidth={1}
         strokeDasharray="4 4"
       />
-
-      {/* sparkline */}
       <polyline
         points={points}
         fill="none"
@@ -108,8 +100,6 @@ function RevenueSparkline({ values }: { values: number[] }) {
         strokeLinejoin="round"
         className="drop-shadow-[0_0_6px_rgba(56,189,248,0.45)]"
       />
-
-      {/* last point */}
       <circle
         cx={lastX}
         cy={lastY}
@@ -122,25 +112,37 @@ function RevenueSparkline({ values }: { values: number[] }) {
   );
 }
 
+// ---------- page ----------
+
 export default function DashboardOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [revenue7, setRevenue7] = useState(0);
-  const [revenue7Change, setRevenue7Change] = useState<number | null>(null);
+  const [revenue7Change, setRevenue7Change] =
+    useState<number | null>(null);
 
   const [revenue30, setRevenue30] = useState(0);
-  const [revenue30Change, setRevenue30Change] = useState<number | null>(null);
+  const [revenue30Change, setRevenue30Change] =
+    useState<number | null>(null);
 
   const [sparklineValues, setSparklineValues] = useState<number[]>([]);
   const [lastSaleDate, setLastSaleDate] = useState<string | null>(null);
+
+  // mini-insights
+  const [coverage30, setCoverage30] = useState<number | null>(null);
+  const [activeDays30, setActiveDays30] = useState(0);
+  const [bestDayDate, setBestDayDate] = useState<string | null>(null);
+  const [bestDayRevenue, setBestDayRevenue] = useState(0);
+  const [avgTicket30, setAvgTicket30] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
       if (userError || !userData.user) {
         setError('You must be logged in to view your dashboard.');
         setLoading(false);
@@ -162,13 +164,14 @@ export default function DashboardOverviewPage() {
 
       const cafeId = cafe.id;
 
-      // --- Load sales for last 60 days ---
+      // Load last 60 days of sales (enough for 30d window + previous 30d)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const daysAgo = (n: number) => {
         const d = new Date(today);
         d.setDate(d.getDate() - n);
+        d.setHours(0, 0, 0, 0);
         return d;
       };
 
@@ -177,7 +180,9 @@ export default function DashboardOverviewPage() {
 
       const { data: sales, error: salesError } = await supabase
         .from('sales')
-        .select('sale_date,total_revenue')
+        .select(
+          'id,cafe_id,sale_date,total_revenue,total_transactions,cash_revenue,card_revenue,notes',
+        )
         .eq('cafe_id', cafeId)
         .gte('sale_date', fromDate)
         .lte('sale_date', toDate)
@@ -190,54 +195,84 @@ export default function DashboardOverviewPage() {
         return;
       }
 
-      // Group into a map by date
+      const rows = (sales ?? []) as SalesRow[];
+
+      // Use central analytics engine
+      const insights7 = computeSalesInsights(rows, 7);
+      const insights30 = computeSalesInsights(rows, 30);
+
+      setRevenue7(insights7.totalRevenue);
+      setRevenue7Change(insights7.revenueChangePct);
+
+      setRevenue30(insights30.totalRevenue);
+      setRevenue30Change(insights30.revenueChangePct);
+
+      // Sparkline for last 30 days
       const revenueMap = new Map<string, number>();
-      (sales ?? []).forEach(row => {
-        const date = row.sale_date as string;
+      const txMap = new Map<string, number>();
+
+      for (const row of rows) {
+        const date = row.sale_date;
         const existing = revenueMap.get(date) ?? 0;
-        revenueMap.set(date, existing + Number(row.total_revenue ?? 0));
-      });
+        revenueMap.set(date, existing + (row.total_revenue ?? 0));
 
-      // Helper: sum over a date range [startOffset, endOffset] (inclusive) where 0 = today
-      const sumRange = (startOffset: number, endOffset: number) => {
-        let total = 0;
-        for (let offset = startOffset; offset <= endOffset; offset++) {
-          const d = daysAgo(-offset); // negative because startOffset is e.g. -6
-          const key = d.toISOString().slice(0, 10);
-          total += revenueMap.get(key) ?? 0;
-        }
-        return total;
-      };
+        const tx =
+          row.total_transactions != null
+            ? Number(row.total_transactions)
+            : 0;
+        txMap.set(date, (txMap.get(date) ?? 0) + tx);
+      }
 
-      // Last 7 days: offsets -6..0  (today + previous 6)
-      const last7 = sumRange(-6, 0);
-      const prev7 = sumRange(-13, -7);
-
-      // Last 30 days
-      const last30 = sumRange(-29, 0);
-      const prev30 = sumRange(-59, -30);
-
-      setRevenue7(last7);
-      setRevenue7Change(calcChange(last7, prev7));
-      setRevenue30(last30);
-      setRevenue30Change(calcChange(last30, prev30));
-
-      // Sparkline: revenue for each of last 30 days (oldest -> newest)
       const spark: number[] = [];
-      for (let offset = -29; offset <= 0; offset++) {
-        const d = daysAgo(-offset);
+      for (let offset = 29; offset >= 0; offset--) {
+        const d = daysAgo(offset);
         const key = d.toISOString().slice(0, 10);
         spark.push(revenueMap.get(key) ?? 0);
       }
       setSparklineValues(spark);
 
       // Most recent sale date
-      if (sales && sales.length > 0) {
-        const latest = sales[sales.length - 1].sale_date as string;
+      if (rows.length > 0) {
+        const latest = rows[rows.length - 1].sale_date;
         setLastSaleDate(latest);
       } else {
         setLastSaleDate(null);
       }
+
+      // ---- MINI-INSIGHTS (last 30 days) ----
+      let activeDays = 0;
+      let bestDay = '';
+      let bestRevenue = 0;
+      let totalTx30 = 0;
+
+      for (let offset = 29; offset >= 0; offset--) {
+        const d = daysAgo(offset);
+        const key = d.toISOString().slice(0, 10);
+
+        const dayRevenue = revenueMap.get(key) ?? 0;
+        const dayTx = txMap.get(key) ?? 0;
+
+        if (dayRevenue > 0) {
+          activeDays++;
+        }
+        if (dayRevenue > bestRevenue) {
+          bestRevenue = dayRevenue;
+          bestDay = key;
+        }
+
+        totalTx30 += dayTx;
+      }
+
+      const coverage =
+        activeDays > 0 ? (activeDays / 30) * 100 : null;
+      const avgTicket =
+        totalTx30 > 0 ? insights30.totalRevenue / totalTx30 : null;
+
+      setActiveDays30(activeDays);
+      setCoverage30(coverage);
+      setBestDayDate(bestDay || null);
+      setBestDayRevenue(bestRevenue);
+      setAvgTicket30(avgTicket);
 
       setLoading(false);
     }
@@ -245,15 +280,31 @@ export default function DashboardOverviewPage() {
     load();
   }, []);
 
-  // --- RENDER ---
+  // ---------- loading state (Task 2 polish) ----------
 
   if (loading) {
     return (
-      <section className="border border-slate-800 rounded-xl bg-slate-900/40 p-6">
-        <p className="text-sm text-slate-300">Loading overview…</p>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
+          <div className="h-3 w-64 bg-slate-900 rounded animate-pulse" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
+          <SkeletonChart height={120} />
+          <SkeletonChart height={120} />
+        </div>
       </section>
     );
   }
+
+  // ---------- error state ----------
 
   if (error) {
     return (
@@ -263,14 +314,17 @@ export default function DashboardOverviewPage() {
     );
   }
 
+  // ---------- main content ----------
+
   return (
     <section className="space-y-6">
       {/* Header */}
       <header>
         <h2 className="text-lg font-semibold">Overview</h2>
         <p className="mt-1 text-sm text-slate-400 max-w-2xl">
-          This is your Local Pulse overview. As you add sales (and later, reviews),
-          this panel shows key metrics for your café at a glance.
+          This is your Local Pulse overview. As you add sales (and
+          later, reviews), this panel shows key metrics for your café
+          at a glance.
         </p>
       </header>
 
@@ -282,19 +336,21 @@ export default function DashboardOverviewPage() {
               Revenue (last 7 days)
             </p>
 
-            <AnimatedNumber 
+            <AnimatedNumber
               value={revenue7}
               prefix="A"
               className="text-2xl font-semibold text-slate-50"
             />
-              
+
             <div className="mt-3 flex items-center justify-between">
-              <TrendLabel change={revenue7Change} label="vs previous 7 days" />
+              <TrendLabel
+                change={revenue7Change}
+                label="vs previous 7 days"
+              />
             </div>
           </AnimatedCard>
 
           <AnimatedCard variant="scale" glass>
-            {/* Revenue 30d + sparkline */}
             <p className="text-xs font-medium text-slate-400 mb-1">
               Revenue (last 30 days)
             </p>
@@ -310,7 +366,10 @@ export default function DashboardOverviewPage() {
             </div>
 
             <div className="mt-2 flex items-center justify-between">
-              <TrendLabel change={revenue30Change} label="vs previous 30 days" />
+              <TrendLabel
+                change={revenue30Change}
+                label="vs previous 30 days"
+              />
               <span className="text-[11px] text-slate-500">
                 Sparkline shows daily revenue over the last 30 days.
               </span>
@@ -318,51 +377,115 @@ export default function DashboardOverviewPage() {
           </AnimatedCard>
 
           <AnimatedCard>
-            {/* Latest sale date */}
             <p className="text-xs font-medium text-slate-400 mb-1">
               Most recent sales entry
             </p>
             <p className="text-xl font-semibold text-slate-50">
-              {lastSaleDate ? formatDate(lastSaleDate) : 'No sales yet'}
+              {lastSaleDate
+                ? formatDate(lastSaleDate)
+                : 'No sales yet'}
             </p>
             <p className="mt-3 text-xs text-slate-400">
               Keep this up to date to make your trends accurate.
             </p>
           </AnimatedCard>
-
         </AnimatedCardGroup>
       </div>
 
-      {/* Bottom row: reviews placeholders (for future sections) */}
+      {/* NEW: mini-insights row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-6">
+        <AnimatedCard>
+          <p className="text-xs font-medium text-slate-400 mb-1">
+            Data coverage (last 30 days)
+          </p>
+          <p className="text-xl font-semibold text-slate-50">
+            {coverage30 != null ? `${coverage30.toFixed(0)}%` : '—'}
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            {activeDays30} of 30 days have at least one sales
+            entry logged.
+          </p>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <p className="text-xs font-medium text-slate-400 mb-1">
+            Best day (last 30 days)
+          </p>
+          <p className="text-sm font-semibold text-slate-50">
+            {bestDayDate ? formatDate(bestDayDate) : '—'}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            {bestDayRevenue > 0
+              ? `Revenue: A$${bestDayRevenue.toLocaleString('en-AU', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+              : 'Add more sales to see your standout days.'}
+          </p>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <p className="text-xs font-medium text-slate-400 mb-1">
+            Avg ticket size (last 30 days)
+          </p>
+          <p className="text-xl font-semibold text-slate-50">
+            {avgTicket30 != null
+              ? `A$${avgTicket30.toLocaleString('en-AU', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+              : '—'}
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            Based on total revenue ÷ total transactions where
+            transactions were recorded.
+          </p>
+        </AnimatedCard>
+      </div>
+
+      {/* Bottom row: reviews placeholders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
-        {/* Reviews summary */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-400 mb-1">
             Reviews (last 30 days)
           </p>
           <p className="text-sm text-slate-400">
-            Once you connect Local Pulse to your reviews source, we&apos;ll show
-            your average rating, review count, and change over time here.
+            Once you connect Local Pulse to your reviews source,
+            we&apos;ll show your average rating, review count, and
+            change over time here.
           </p>
           <div className="mt-4 h-16 rounded-lg border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Reviews integration coming soon
           </div>
         </div>
 
-        {/* Latest review highlight */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-400 mb-1">
             Latest review highlight
           </p>
           <p className="text-sm text-slate-400">
-            When new reviews come in, we&apos;ll surface a recent comment here so
-            you can quickly see what guests are saying.
+            When new reviews come in, we&apos;ll surface a recent
+            comment here so you can quickly see what guests are saying.
           </p>
           <div className="mt-4 h-16 rounded-lg border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Waiting for your first review
           </div>
         </div>
       </div>
+
+      {ENABLE_ANALYTICS_DEBUG && (
+        <DebugPanel
+          title="Overview debug"
+          data={{
+            revenue7,
+            revenue7Change,
+            revenue30,
+            revenue30Change,
+            sparklineValues,
+            lastSaleDate,
+          }}
+        />
+      )}
     </section>
   );
 }
