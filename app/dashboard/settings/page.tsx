@@ -1,22 +1,37 @@
-'use client';
+"use client";
+
+import AnimatedCard from "@/components/ui/AnimatedCard";
+import { ReviewsIntegrationCard } from "@/components/settings/ReviewsIntegrationCard";
 
 export default function SettingsPage() {
   return (
-    <section className="border border-slate-800 rounded-xl bg-slate-900/40 p-6">
-      <h2 className="text-lg font-semibold mb-2">Settings</h2>
-      <p className="text-slate-300 text-sm mb-4">
-        This page will let you manage café details, integrations, and account
-        preferences.
-      </p>
+    <section className="space-y-4">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">Settings</h2>
+        <p className="text-slate-300 text-sm">
+          Manage café details, integrations, and account preferences.
+        </p>
+      </header>
 
-      <div className="text-sm text-slate-400">
-        Planned sections:
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Café name and profile</li>
-          <li>Google Reviews / platform connections</li>
-          <li>POS integration configuration</li>
-          <li>Account and notification settings</li>
-        </ul>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr,1.4fr] gap-4">
+        {/* Left: general / future sections */}
+        <AnimatedCard>
+          <h3 className="text-sm font-semibold text-slate-100 mb-1">
+            General
+          </h3>
+          <p className="text-xs text-slate-400 mb-3">
+            These settings are coming soon as we grow Local Pulse.
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-xs text-slate-400">
+            <li>Café name and profile</li>
+            <li>Google Reviews / platform connections</li>
+            <li>POS integration configuration</li>
+            <li>Account and notification settings</li>
+          </ul>
+        </AnimatedCard>
+
+        {/* Right: actual working integration */}
+        <ReviewsIntegrationCard />
       </div>
     </section>
   );

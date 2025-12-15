@@ -36,6 +36,7 @@ export default function LoginPage() {
         setMessage(error.message);
       } else{
         router.push('/dashboard');  // redirect on success
+        router.refresh(); // helps next re-render new session state
       }
     }
   }
