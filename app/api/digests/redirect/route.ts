@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   if (recipientId) {
     await supabaseAdmin
-      .from("digest_recipients")
+      .from("digest_recipients" as any)
       .update({ clicked_at: new Date().toISOString() })
       .eq("id", recipientId);
   }
