@@ -493,19 +493,19 @@ function downloadCsv(filename: string, csv: string) {
         {/* Header skeleton */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-4 w-20 bg-slate-800 rounded animate-pulse" />
-            <div className="h-3 w-56 bg-slate-900 rounded animate-pulse" />
+            <div className="h-4 w-20 bg-white rounded animate-pulse" />
+            <div className="h-3 w-56 bg-white rounded animate-pulse" />
           </div>
           <div className="flex gap-2">
-            <div className="h-8 w-28 bg-slate-900 rounded-md border border-slate-800 animate-pulse" />
-            <div className="h-8 w-28 bg-slate-900 rounded-md border border-slate-800 animate-pulse" />
+            <div className="h-8 w-28 bg-white rounded-md border border-[#E2E8F0] animate-pulse" />
+            <div className="h-8 w-28 bg-white rounded-md border border-[#E2E8F0] animate-pulse" />
           </div>
         </div>
 
         {/* Table card skeleton */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-sm">
+        <div className="rounded-xl bg-white lp-card p-4 md:p-5 shadow-sm">
           {/* Table header skeleton */}
-          <div className="h-3 w-32 bg-slate-800 rounded mb-4 animate-pulse" />
+          <div className="h-3 w-32 bg-white rounded mb-4 animate-pulse" />
 
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -513,13 +513,13 @@ function downloadCsv(filename: string, csv: string) {
                 key={i}
                 className="grid grid-cols-[1.2fr_repeat(5,0.8fr)] gap-3 text-xs"
               >
-                <div className="h-3 bg-slate-800/80 rounded animate-pulse" />
-                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
-                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
-                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
-                <div className="h-3 bg-slate-800/70 rounded animate-pulse" />
+                <div className="h-3 bg-[#F9FBFC] rounded animate-pulse" />
+                <div className="h-3 bg-[#E2E8F0] rounded animate-pulse" />
+                <div className="h-3 bg-[#E2E8F0] rounded animate-pulse" />
+                <div className="h-3 bg-[#E2E8F0] rounded animate-pulse" />
+                <div className="h-3 bg-[#E2E8F0] rounded animate-pulse" />
                 <div className="flex justify-end">
-                  <div className="h-6 w-14 bg-slate-900 border border-slate-800 rounded-md animate-pulse" />
+                  <div className="h-6 w-14 bg-white border border-[#E2E8F0] rounded-md animate-pulse" />
                 </div>
               </div>
             ))}
@@ -537,7 +537,7 @@ function downloadCsv(filename: string, csv: string) {
           <button
             type="button"
             onClick={openAddModal}
-            className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-xs font-medium"
+            className="px-3 py-1.5 rounded-md bg-[#22C3A6] hover:bg-[#17A98F] text-xs font-medium text-[#0B1220]"
           >
             + Add entries
           </button>
@@ -545,7 +545,7 @@ function downloadCsv(filename: string, csv: string) {
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
-            className="px-3 py-1.5 rounded-md border border-slate-600 text-xs font-medium text-slate-100 bg-slate-900 hover:bg-slate-800"
+            className="px-3 py-1.5 rounded-md border border-[#E2E8F0] text-xs font-medium text-[#0B1220] bg-white hover:bg-white"
           >
             Import CSV
         </button>
@@ -553,7 +553,7 @@ function downloadCsv(filename: string, csv: string) {
         <button
           type="button"
           onClick={handleExportCsv}
-          className="px-3 py-1.5 rounded-md border border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-xs font-medium"
+          className="px-3 py-1.5 rounded-md bg-white lp-card hover:bg-white text-xs font-medium"
         >
           Export CSV
         </button>
@@ -561,13 +561,13 @@ function downloadCsv(filename: string, csv: string) {
       </div>
 
       {/* Table */}
-      <div className="border border-slate-800 rounded-xl bg-slate-900/60 p-3 md:p-4">
-        <h3 className="text-sm font-semibold mb-3 text-slate-200">
+      <div className="border border-[#E2E8F0] rounded-xl bg-[#F9FBFC] p-3 md:p-4">
+        <h3 className="text-sm font-semibold mb-3 text-[#0B1220]">
           Recent entries
         </h3>
 
         {sales.length === 0 ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-[#94A3B8]">
             No sales recorded yet. Click “Add entry” to log your first day.
           </p>
         ) : (
@@ -575,7 +575,7 @@ function downloadCsv(filename: string, csv: string) {
             <div className="overflow-x-auto -mx-3 md:mx-0">
               <table className="min-w-[640px] w-full text-xs sm:text-sm text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 text-[11px] md:text-xs text-slate-400">
+                  <tr className="border-b border-[#E2E8F0] text-[11px] md:text-xs text-[#94A3B8]">
                     <th className="py-2 px-2 md:px-3 text-left whitespace-nowrap">Date</th>
                     <th className="py-2 px-2 md:px-3 text-left whitespace-nowrap">Total revenue</th>
                     <th className="py-2 px-2 md:px-3 text-left whitespace-nowrap">Transactions</th>
@@ -589,7 +589,7 @@ function downloadCsv(filename: string, csv: string) {
                   {sales.map(row => (
                     <tr
                       key={row.id}
-                      className="border-b border-slate-900 last:border-0 text-slate-200"
+                      className="border-b border-[#E2E8F0] last:border-0 text-[#0B1220]"
                     >
                       <td className="py-2 px-2 md:px-3 text-[11px] md:text-sm whitespace-nowrap">
                         {row.sale_date}
@@ -618,14 +618,14 @@ function downloadCsv(filename: string, csv: string) {
                           <button
                             type="button"
                             onClick={() => openEditModal(row)}
-                            className="text-[11px] sm:text-xs px-2 py-1 rounded-md border border-slate-600 hover:bg-slate-800"
+                            className="text-[11px] sm:text-xs px-2 py-1 rounded-md border border-[#E2E8F0] hover:bg-white"
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(row)}
-                            className="text-[11px] sm:text-xs px-2 py-1 rounded-md border border-red-600 text-red-300 hover:bg-red-900/40"
+                            className="text-[11px] sm:text-xs px-2 py-1 rounded-md border border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444]/10"
                           >
                             Delete
                           </button>
@@ -643,7 +643,7 @@ function downloadCsv(filename: string, csv: string) {
                   type="button"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="text-xs px-3 py-1.5 rounded-md border border-slate-600 hover:bg-slate-800 disabled:opacity-60"
+                  className="text-xs px-3 py-1.5 rounded-md border border-[#E2E8F0] hover:bg-white disabled:opacity-60"
                 >
                   {loadingMore ? 'Loading…' : 'Load more'}
                 </button>
@@ -660,18 +660,18 @@ function downloadCsv(filename: string, csv: string) {
             className="
               w-full max-w-lg sm:max-w-3xl 
               max-h-[90vh] overflow-y-auto 
-              rounded-xl bg-slate-950 border border-slate-800 
+              rounded-xl bg-white border border-[#E2E8F0] 
               p-4 sm:p-6 shadow-xl mx-4
             "
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-100">
+              <h3 className="text-sm font-semibold text-[#0B1220]">
                 {editingId ? 'Edit sales entry' : 'Add sales entry'}
               </h3>
               <button
                 type="button"
                 onClick={closeModal}
-                className="text-xs text-slate-400 hover:text-slate-200"
+                className="text-xs text-[#94A3B8] hover:text-[#0B1220]"
               >
                 Close
               </button>
@@ -680,31 +680,31 @@ function downloadCsv(filename: string, csv: string) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-wrap gap-4">
                 <div className="flex flex-col text-sm">
-                  <label className="mb-1 text-slate-300">Date</label>
+                  <label className="mb-1 text-[#94A3B8]">Date</label>
                   <input
                     type="date"
                     value={saleDate}
                     onChange={e => setSaleDate(e.target.value)}
-                    className="rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                    className="rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                     required
                   />
                 </div>
 
                 <div className="flex flex-col text-sm">
-                  <label className="mb-1 text-slate-300">Total revenue ($)</label>
+                  <label className="mb-1 text-[#94A3B8]">Total revenue ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={totalRevenue}
                     onChange={e => setTotalRevenue(e.target.value)}
-                    className="rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                    className="rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                     required
                   />
                 </div>
 
                 <div className="flex flex-col text-sm">
-                  <label className="mb-1 text-slate-300">
+                  <label className="mb-1 text-[#94A3B8]">
                     Total transactions
                   </label>
                   <input
@@ -712,41 +712,41 @@ function downloadCsv(filename: string, csv: string) {
                     min="0"
                     value={totalTransactions}
                     onChange={e => setTotalTransactions(e.target.value)}
-                    className="rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                    className="rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                   />
                 </div>
 
                 <div className="flex flex-col text-sm">
-                  <label className="mb-1 text-slate-300">Cash revenue ($)</label>
+                  <label className="mb-1 text-[#94A3B8]">Cash revenue ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={cashRevenue}
                     onChange={e => setCashRevenue(e.target.value)}
-                    className="rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                    className="rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                   />
                 </div>
 
                 <div className="flex flex-col text-sm">
-                  <label className="mb-1 text-slate-300">Card revenue ($)</label>
+                  <label className="mb-1 text-[#94A3B8]">Card revenue ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={cardRevenue}
                     onChange={e => setCardRevenue(e.target.value)}
-                    className="rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                    className="rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                   />
                 </div>
               </div>
 
               <div className="text-sm">
-                <label className="mb-1 block text-slate-300">Notes</label>
+                <label className="mb-1 block text-[#94A3B8]">Notes</label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  className="w-full rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-sm outline-none focus:border-sky-500"
+                  className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 text-sm outline-none focus:border-[#22C3A6]"
                   rows={2}
                   placeholder="Optional comments (events, promos, weather, etc.)"
                 />
@@ -755,10 +755,10 @@ function downloadCsv(filename: string, csv: string) {
               <div className="flex items-center justify-between text-xs">
                 <div className="space-y-1">
                   {errorMessage && (
-                    <p className="text-red-400">{errorMessage}</p>
+                    <p className="text-[#EF4444]">{errorMessage}</p>
                   )}
                   {successMessage && (
-                    <p className="text-emerald-400">{successMessage}</p>
+                    <p className="text-[#22C3A6]">{successMessage}</p>
                   )}
                 </div>
 
@@ -767,7 +767,7 @@ function downloadCsv(filename: string, csv: string) {
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="px-3 py-1.5 rounded-md border border-slate-600 text-slate-200 hover:bg-slate-800"
+                      className="px-3 py-1.5 rounded-md border border-[#E2E8F0] text-[#0B1220] hover:bg-white"
                     >
                       Reset
                     </button>
@@ -775,7 +775,7 @@ function downloadCsv(filename: string, csv: string) {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-xs font-medium disabled:opacity-60"
+                    className="px-3 py-1.5 rounded-md bg-[#22C3A6] hover:bg-[#17A98F] text-xs font-medium text-[#0B1220] disabled:opacity-60"
                   >
                     {saving
                       ? 'Saving…'
@@ -796,7 +796,7 @@ function downloadCsv(filename: string, csv: string) {
             className="
               w-full max-w-5xl 
               max-h-[90vh] overflow-y-auto 
-              rounded-2xl bg-slate-900 border border-slate-700 
+              rounded-2xl bg-white border border-[#E2E8F0] 
               p-4 sm:p-6 shadow-xl mx-4
             "
           >
@@ -804,20 +804,20 @@ function downloadCsv(filename: string, csv: string) {
               <h2 className="text-lg font-semibold">Add sales entries</h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-xs text-slate-400 hover:text-slate-200"
+                className="text-xs text-[#94A3B8] hover:text-[#0B1220]"
               >
                 Close
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-[#94A3B8] mb-3">
               You can add multiple days at once. Only rows with a date and total revenue
               will be saved.
             </p>
 
             <div className="-mx-3 md:mx-0 overflow-x-auto">
-              <table className="w-full text-xs text-slate-200 border-separate border-spacing-y-2">
-                <thead className="text-slate-400">
+              <table className="w-full text-xs text-[#0B1220] border-separate border-spacing-y-2">
+                <thead className="text-[#94A3B8]">
                   <tr>
                     <th className="text-left px-2">Date</th>
                     <th className="text-left px-2">Total revenue ($)</th>
@@ -834,7 +834,7 @@ function downloadCsv(filename: string, csv: string) {
                       <td className="px-2">
                         <input
                           type="date"
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.saleDate}
                           onChange={e => updateRow(index, 'saleDate', e.target.value)}
                         />
@@ -843,7 +843,7 @@ function downloadCsv(filename: string, csv: string) {
                         <input
                           type="number"
                           step="0.01"
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.totalRevenue}
                           onChange={e => updateRow(index, 'totalRevenue', e.target.value)}
                           placeholder="Required"
@@ -852,7 +852,7 @@ function downloadCsv(filename: string, csv: string) {
                       <td className="px-2">
                         <input
                           type="number"
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.totalTransactions}
                           onChange={e =>
                             updateRow(index, 'totalTransactions', e.target.value)
@@ -863,7 +863,7 @@ function downloadCsv(filename: string, csv: string) {
                         <input
                           type="number"
                           step="0.01"
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.cashRevenue}
                           onChange={e => updateRow(index, 'cashRevenue', e.target.value)}
                         />
@@ -872,14 +872,14 @@ function downloadCsv(filename: string, csv: string) {
                         <input
                           type="number"
                           step="0.01"
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.cardRevenue}
                           onChange={e => updateRow(index, 'cardRevenue', e.target.value)}
                         />
                       </td>
                       <td className="px-2">
                         <input
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 outline-none focus:border-sky-500"
+                          className="w-full rounded-md bg-white border border-[#E2E8F0] px-2 py-1 outline-none focus:border-[#22C3A6]"
                           value={row.notes}
                           onChange={e => updateRow(index, 'notes', e.target.value)}
                           placeholder="Optional"
@@ -889,7 +889,7 @@ function downloadCsv(filename: string, csv: string) {
                         <button
                           type="button"
                           onClick={() => removeRow(index)}
-                          className="text-xs text-slate-400 hover:text-red-400"
+                          className="text-xs text-[#94A3B8] hover:text-[#EF4444]"
                         >
                           Remove
                         </button>
@@ -901,14 +901,14 @@ function downloadCsv(filename: string, csv: string) {
             </div>
 
             {saveError && (
-              <p className="text-xs text-red-400 mt-3">{saveError}</p>
+              <p className="text-xs text-[#EF4444] mt-3">{saveError}</p>
             )}
 
             <div className="mt-4 flex items-center justify-between">
               <button
                 type="button"
                 onClick={addRow}
-                className="text-xs text-sky-400 hover:text-sky-300"
+                className="text-xs text-[#22C3A6] hover:text-[#17A98F]"
               >
                 + Add row
               </button>
@@ -917,7 +917,7 @@ function downloadCsv(filename: string, csv: string) {
                 type="button"
                 onClick={handleAddEntries}
                 disabled={saving}
-                className="px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-xs font-medium disabled:opacity-60"
+                className="px-4 py-2 rounded-md bg-[#22C3A6] hover:bg-[#17A98F] text-xs font-medium text-[#0B1220] disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save all entries'}
               </button>
@@ -946,3 +946,13 @@ function downloadCsv(filename: string, csv: string) {
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+

@@ -53,11 +53,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className={[
                 "pointer-events-auto rounded-lg border px-3 py-2 text-xs shadow-lg animate-fade-in",
                 toast.variant === "success" &&
-                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-100",
+                  "border-[#22C3A6]/40 bg-[#22C3A6]/10 text-[#E2E8F0]",
                 toast.variant === "error" &&
-                  "border-red-500/40 bg-red-500/10 text-red-100",
+                  "border-[#EF4444]/40 bg-[#EF4444]/10 text-[#E2E8F0]",
                 toast.variant === "info" &&
-                  "border-sky-500/40 bg-sky-500/10 text-sky-100",
+                  "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#E2E8F0]",
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -78,3 +78,4 @@ export function useToast() {
   }
   return ctx;
 }
+

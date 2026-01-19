@@ -21,14 +21,14 @@ export function DebugPanel({ title = 'Debug', data, className }: DebugPanelProps
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="px-2 py-1 rounded-md border border-amber-400/60 bg-slate-950/90 text-amber-100 hover:bg-amber-500/10 shadow-lg"
+        className="px-2 py-1 rounded-md border border-[#22C3A6]/40 bg-[#0F172A] text-[#E2E8F0] hover:bg-[#22C3A6]/10 shadow-lg"
       >
         {open ? 'Hide debug' : 'Show debug'}
       </button>
 
       {open && (
-        <div className="mt-2 max-h-72 w-[360px] overflow-auto rounded-lg border border-amber-500/60 bg-slate-950/95 p-3 text-amber-50 shadow-2xl">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-300">
+        <div className="mt-2 max-h-72 w-[360px] overflow-auto rounded-lg border border-[#22C3A6]/40 bg-[#0F172A] p-3 text-[#E2E8F0] shadow-2xl">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
             {title}
           </div>
           <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-snug">
@@ -39,3 +39,4 @@ export function DebugPanel({ title = 'Debug', data, className }: DebugPanelProps
     </div>
   );
 }
+

@@ -1,0 +1,60 @@
+<svg
+  width="240"
+  height="64"
+  viewBox="0 0 240 64"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  shape-rendering="geometricPrecision"
+>
+  <rect
+    x="6"
+    y="6"
+    width="52"
+    height="52"
+    rx="14"
+    stroke="currentColor"
+    stroke-width="3"
+    vector-effect="non-scaling-stroke"
+  />
+  <line
+    x1="18"
+    y1="20"
+    x2="34"
+    y2="20"
+    stroke="currentColor"
+    stroke-width="4"
+    stroke-linecap="round"
+    vector-effect="non-scaling-stroke"
+  />
+  <line
+    x1="18"
+    y1="32"
+    x2="46"
+    y2="32"
+    stroke="currentColor"
+    stroke-width="4"
+    stroke-linecap="round"
+    vector-effect="non-scaling-stroke"
+  />
+  <line
+    x1="18"
+    y1="44"
+    x2="46"
+    y2="44"
+    stroke="currentColor"
+    stroke-width="4"
+    stroke-linecap="round"
+    vector-effect="non-scaling-stroke"
+  />
+  <circle cx="44" cy="21" r="3" fill="currentColor" />
+  <text
+    x="80"
+    y="40"
+    font-family="'Inter', 'DM Sans', 'Plus Jakarta Sans', Arial, sans-serif"
+    font-size="28"
+    font-weight="500"
+    fill="currentColor"
+  >
+    LocalPulse
+  </text>
+</svg>

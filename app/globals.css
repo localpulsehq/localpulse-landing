@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F3F6F9;
+  --foreground: #0B1220;
 }
 
 @theme inline {
@@ -14,9 +14,53 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0B1220;
+    --foreground: #E2E8F0;
   }
+}
+
+.lp-light-app-bg {
+  background:
+    radial-gradient(
+      900px 600px at 80% -10%,
+      rgba(45, 212, 191, 0.10),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 500px at -10% 20%,
+      rgba(59, 130, 246, 0.08),
+      transparent 55%
+    ),
+    #F3F6F9;
+}
+
+.lp-light-marketing-bg {
+  background:
+    radial-gradient(
+      900px 600px at 80% -10%,
+      rgba(45, 212, 191, 0.10),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 500px at -10% 20%,
+      rgba(59, 130, 246, 0.08),
+      transparent 55%
+    ),
+    #F6F9FA;
+}
+
+.lp-card {
+  background: #FFFFFF;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.lp-card-soft {
+  background: #F9FBFC;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 body {
@@ -92,7 +136,7 @@ body {
   .skeleton {
     position: relative;
     overflow: hidden;
-    background-color: rgb(15 23 42); /* slate-900 */
+    background-color: #0F172A;
   }
 
   .skeleton::after {

@@ -76,7 +76,7 @@ export function ReviewsIntegrationCard() {
         .maybeSingle();
 
       if (cafeError || !cafe) {
-        setErrorMessage("Could not load your café.");
+        setErrorMessage("Could not load your cafe.");
         setLoading(false);
         return;
       }
@@ -121,7 +121,7 @@ async function handleSave() {
 
   if (!placeId) {
     setErrorMessage(
-      "Please paste a valid Google Place ID (starts with ChIJ…)."
+      "Please paste a valid Google Place ID (starts with ChIJ...)."
     );
     return;
   }
@@ -196,7 +196,7 @@ async function handleSyncNow() {
     setTimeout(() => setStatusMessage(null), 2500);
   } catch (err: any) {
     console.error("Sync error:", err);
-    setErrorMessage(err?.message ?? "Sync failed – check server logs.");
+    setErrorMessage(err?.message ?? "Sync failed - check server logs.");
   } finally {
     setSyncing(false);
   }
@@ -218,17 +218,17 @@ async function handleSyncNow() {
     <AnimatedCard>
       <div className="flex flex-col gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-100">
+          <h3 className="text-sm font-semibold text-[#0B1220]">
             Reviews integration
           </h3>
-          <p className="mt-1 text-xs text-slate-400 max-w-xl">
-            Connect your café&apos;s Google Reviews so Local Pulse can show your
+          <p className="mt-1 text-xs text-[#94A3B8] max-w-xl">
+            Connect your cafe&apos;s Google Reviews so LocalPulse can show your
             average rating, review count, and recent comments.
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-xs font-medium text-slate-300">
+          <label className="block text-xs font-medium text-[#94A3B8]">
             Google Place ID
           </label>
           <input
@@ -236,19 +236,19 @@ async function handleSyncNow() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Paste your Google Place ID (ChIJ...)"
-            className="w-full rounded-md border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            className="w-full rounded-md bg-[#F9FBFC] lp-card-soft px-3 py-2 text-sm text-[#0B1220] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[rgba(34,195,166,0.35)] focus:border-[#22C3A6]"
           />
-          <p className="text-[11px] text-slate-500">
-            Paste your café’s Google Place ID (starts with{" "}
-            <code className="mx-1 rounded bg-slate-900 px-1 py-0.5 text-[10px]">
-              ChIJ…
+          <p className="text-[11px] text-[#94A3B8]">
+            Paste your cafe's Google Place ID (starts with{" "}
+            <code className="mx-1 rounded bg-[#F9FBFC] px-1 py-0.5 text-[10px]">
+              ChIJ...
             </code>
             ).
             <br />
             <a
               href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder"
               target="_blank"
-              className="text-sky-400 underline"
+              className="text-[#22C3A6] underline"
             >
               Open Google Place ID Finder
             </a>
@@ -260,34 +260,38 @@ async function handleSyncNow() {
             type="button"
             onClick={handleSave}
             disabled={saving || !input.trim()}
-            className="inline-flex items-center justify-center rounded-md bg-sky-600 px-4 py-2 text-xs font-medium text-slate-50 hover:bg-sky-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center justify-center rounded-md bg-[#22C3A6] px-4 py-2 text-xs font-medium text-[#0B1220] hover:bg-[#17A98F] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Saving…" : "Save & connect"}
+            {saving ? "Saving..." : connected ? "Update Place ID" : "Save & connect"}
           </button>
 
           <button
             type="button"
             onClick={handleSyncNow}
             disabled={!connected || syncing}
-            className="inline-flex items-center justify-center rounded-md border border-slate-700 px-4 py-2 text-xs font-medium text-slate-100 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center justify-center rounded-md border border-[#E2E8F0] px-4 py-2 text-xs font-medium text-[#0B1220] hover:bg-[#F9FBFC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {syncing ? "Syncing…" : "Sync reviews now"}
+            {syncing ? "Syncing..." : "Sync now"}
           </button>
 
-          <span className="text-[11px] text-slate-500 ml-auto">
-            {connected
-              ? `Google Reviews connected — ${lastSyncedLabel}`
-              : "Not connected yet"}
+          <span className="text-[11px] text-[#94A3B8] ml-auto">
+            {connected ? `Connected · ${lastSyncedLabel}` : "Not connected yet"}
           </span>
         </div>
 
         {statusMessage && (
-          <p className="text-[11px] text-emerald-400">{statusMessage}</p>
+          <p className="text-[11px] text-[#22C3A6]">{statusMessage}</p>
         )}
         {errorMessage && (
-          <p className="text-[11px] text-rose-400">{errorMessage}</p>
+          <p className="text-[11px] text-[#EF4444]">{errorMessage}</p>
         )}
       </div>
     </AnimatedCard>
   );
 }
+
+
+
+
+
+

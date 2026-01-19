@@ -27,6 +27,7 @@ export function formatShortLabel(date: Date | string): string {
   const d = typeof date === "string" ? parseDate(date) : date;
   return format(d, "d MMM");
 }
+
 /**
  * Convert Date → "YYYY-MM-DD"
  */

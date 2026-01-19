@@ -2,14 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,8 +18,8 @@ import { computeSalesInsights, type SalesRow } from '@/lib/analytics/sales';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { SkeletonChart } from '@/components/ui/SkeletonChart';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { 
-  parseDate, toYMD, addDaysSafe, formatShortLabel, weekday 
+import {
+  toYMD, addDaysSafe, formatShortLabel
 } from "@/lib/date";
 import { formatCurrencyAUD } from '@/lib/format';
 import { ENABLE_ANALYTICS_DEBUG } from '@/lib/debug';
@@ -39,6 +35,11 @@ type DailyPoint = {
   total: number;
   cash: number;
   card: number;
+};
+
+type WeeklyPoint = {
+  label: string;
+  total: number;
 };
 
 type TopDayView = {
@@ -108,75 +109,38 @@ function buildDailySeries(
   return days;
 }
 
+function weekStartYmd(d: Date) {
+  const copy = new Date(d);
+  const day = copy.getDay(); // 0=Sun
+  const diff = (day + 6) % 7; // Monday as start
+  copy.setDate(copy.getDate() - diff);
+  return toYMD(copy);
+}
+
+function buildWeeklySeries(points: DailyPoint[]): WeeklyPoint[] {
+  const byWeek = new Map<string, number>();
+  for (const point of points) {
+    const d = new Date(point.date);
+    const weekKey = weekStartYmd(d);
+    byWeek.set(weekKey, (byWeek.get(weekKey) ?? 0) + point.total);
+  }
+
+  return [...byWeek.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([weekKey, total]) => ({
+      label: `Week of ${formatShortLabel(new Date(weekKey))}`,
+      total,
+    }));
+}
+
 function sum(arr: number[]) {
   return arr.reduce((acc, v) => acc + v, 0);
 }
 
 
-// Simple SVG sparkline (kept in case you use it later)
-function RevenueSparkline({ values }: { values: number[] }) {
-  if (!values.length) return null;
-
-  const width = 260;
-  const height = 60;
-  const max = Math.max(...values, 1);
-  const stepX = values.length > 1 ? width / (values.length - 1) : width;
-
-  const points = values
-    .map((v, i) => {
-      const x = i * stepX;
-      const normalized = v / max;
-      const y = height - 6 - normalized * (height - 16);
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  const lastIndex = values.length - 1;
-  const lastX = lastIndex * stepX;
-  const lastY =
-    height - 6 - (values[lastIndex] / max) * (height - 16);
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-16 text-sky-500/80"
-      aria-hidden="true"
-    >
-      <line
-        x1={0}
-        y1={height - 6}
-        x2={width}
-        y2={height - 6}
-        className="stroke-slate-700"
-        strokeWidth={1}
-        strokeDasharray="4 4"
-      />
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="drop-shadow-[0_0_6px_rgba(56,189,248,0.45)]"
-      />
-      <circle
-        cx={lastX}
-        cy={lastY}
-        r={3}
-        className="fill-sky-400 animate-pulse"
-      />
-    </svg>
-  );
-}
-
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const CHART_COLORS = {
-  line: '#38bdf8',
-  lineFaint: '#0f172a',
-  cash: '#22c55e',
-  card: '#0ea5e9',
   bars: '#38bdf8',
 };
 
@@ -196,7 +160,7 @@ function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
   ];
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/70 border border-slate-800 p-1 text-xs">
+    <div className="inline-flex items-center gap-1 rounded-full bg-white border border-[#E2E8F0] p-1 text-xs">
       {options.map((opt) => (
         <button
           key={opt.key}
@@ -205,10 +169,10 @@ function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
           className={[
             'px-3 py-1 rounded-full transition-colors',
             value === opt.key
-              ? 'bg-sky-600 text-slate-50'
+              ? 'bg-[#22C3A6] text-[#0B1220]'
               : opt.key === 'custom'
-              ? 'text-slate-500 cursor-not-allowed'
-              : 'text-slate-300 hover:bg-slate-800',
+              ? 'text-[#94A3B8] cursor-not-allowed'
+              : 'text-[#94A3B8] hover:bg-white',
           ].join(' ')}
         >
           {opt.label}
@@ -241,23 +205,23 @@ function KpiCard({
 
   return (
     <AnimatedCard delay={delay}>
-      <p className="text-xs font-medium text-slate-400 mb-1">
+      <p className="text-xs font-medium text-[#94A3B8] mb-1">
         {label}
       </p>
-      <p className="text-2xl font-semibold text-slate-50">
+      <p className="text-2xl font-semibold text-[#0B1220]">
         <AnimatedNumber value={value} prefix={prefix} />
       </p>
-      {changePct != null && (
+      {changePct != null && Math.abs(changePct) >= 10 && (
         <p
           className={[
             'mt-2 text-[11px] flex items-center gap-1',
-            positive ? 'text-emerald-400' : 'text-rose-400',
+            positive ? 'text-[#22C3A6]' : 'text-[#94A3B8]',
           ].join(' ')}
         >
           <span>{positive ? '▲' : '▼'}</span>
           <span>{Math.abs(changePct).toFixed(1)}%</span>
           {changeLabel && (
-            <span className="text-slate-400">· {changeLabel}</span>
+            <span className="text-[#94A3B8]">· {changeLabel}</span>
           )}
         </p>
       )}
@@ -324,6 +288,7 @@ export default function SalesAnalyticsPage() {
   // Derived analytics based on range – now powered by computeSalesInsights
   const {
     series,
+    weeklySeries,
     totalRevenue,
     avgDailyRevenue,
     bestWeekdayLabel,
@@ -337,6 +302,7 @@ export default function SalesAnalyticsPage() {
     if (!sales.length) {
       return {
         series: [] as DailyPoint[],
+        weeklySeries: [] as WeeklyPoint[],
         totalRevenue: 0,
         avgDailyRevenue: 0,
         bestWeekdayLabel: null as string | null,
@@ -369,6 +335,7 @@ export default function SalesAnalyticsPage() {
     );
 
     const series = buildDailySeries(filteredForSeries, start, end);
+    const weeklySeries = buildWeeklySeries(series);
 
     // Best weekday label, from revenueByWeekday
     let bestWeekdayLabel: string | null = null;
@@ -413,6 +380,7 @@ export default function SalesAnalyticsPage() {
 
     return {
       series,
+      weeklySeries,
       totalRevenue: insights.totalRevenue,
       avgDailyRevenue: insights.averageDailyRevenue,
       bestWeekdayLabel,
@@ -426,6 +394,54 @@ export default function SalesAnalyticsPage() {
   }, [sales, range]);
 
   const hasData = series.length > 0;
+  const totalWeekdayRevenue = sum(weekdayData.map((d) => d.total));
+  const bestWeekdayIndex =
+    weekdayData.length && totalWeekdayRevenue > 0
+      ? weekdayData.reduce(
+          (bestIdx, day, idx, arr) =>
+            day.total > arr[bestIdx].total ? idx : bestIdx,
+          0
+        )
+      : -1;
+  const worstWeekdayIndex =
+    weekdayData.length && totalWeekdayRevenue > 0
+      ? weekdayData.reduce(
+          (worstIdx, day, idx, arr) =>
+            day.total < arr[worstIdx].total ? idx : worstIdx,
+          0
+        )
+      : -1;
+
+  const paymentTotal = cashTotal + cardTotal;
+  const cardSharePct =
+    paymentTotal > 0 ? Math.round((cardTotal / paymentTotal) * 100) : null;
+  const cashSharePct =
+    paymentTotal > 0 ? Math.round((cashTotal / paymentTotal) * 100) : null;
+
+  const insightCards = [
+    bestWeekdayIndex >= 0
+      ? {
+          title: `${WEEKDAYS[bestWeekdayIndex]}s drive ~${Math.round(
+            (weekdayData[bestWeekdayIndex].total / totalWeekdayRevenue) * 100
+          )}% of revenue`,
+          action:
+            'Consider extending hours or adding staff on your best day.',
+        }
+      : null,
+    worstWeekdayIndex >= 0
+      ? {
+          title: `${WEEKDAYS[worstWeekdayIndex]} is consistently the weakest day`,
+          action: 'Candidate for a lunch special or promo next week.',
+        }
+      : null,
+    cardSharePct != null && cardSharePct >= 70
+      ? {
+          title: `Card payments dominate (${cardSharePct}% of revenue)`,
+          action:
+            'High card usage usually correlates with faster checkout and higher ticket sizes.',
+        }
+      : null,
+  ].filter(Boolean) as { title: string; action: string }[];
 
   // ---------- skeletons ----------
 
@@ -433,8 +449,8 @@ export default function SalesAnalyticsPage() {
     return (
       <section className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
-          <div className="h-8 w-56 bg-slate-900 rounded-full animate-pulse" />
+          <div className="h-5 w-32 bg-white rounded animate-pulse" />
+          <div className="h-8 w-56 bg-white rounded-full animate-pulse" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -470,28 +486,16 @@ export default function SalesAnalyticsPage() {
 
   // ---------- chart tooltips ----------
 
-  const CustomLineTooltip = ({ active, payload }: any) => {
+  const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
-    const point = payload[0].payload as DailyPoint;
+    const value = payload[0]?.value ?? 0;
     return (
-      <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
-        <div className="font-medium mb-1">{point.date}</div>
-        <div>Total: {formatCurrencyAUD(point.total)}</div>
-        <div className="text-slate-400">
-          Cash: {formatCurrencyAUD(point.cash)} · Card:{' '}
-          {formatCurrencyAUD(point.card)}
-        </div>
+      <div className="rounded-md bg-white lp-card px-3 py-2 text-xs text-[#0B1220] shadow-lg">
+        <div className="font-medium mb-1">{label}</div>
+        <div>{formatCurrencyAUD(value)}</div>
       </div>
     );
   };
-
-  const donutData = [
-    { name: 'Card', value: cardTotal, color: CHART_COLORS.card },
-    { name: 'Cash', value: cashTotal, color: CHART_COLORS.cash },
-  ];
-
-  const avgForPeriod =
-    series.length > 0 ? sum(series.map((p) => p.total)) / series.length : 0;
 
   return (
     <section className="space-y-4 md:space-y-6">
@@ -499,295 +503,220 @@ export default function SalesAnalyticsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Sales analytics</h2>
-          <p className="text-sm text-slate-400">
-            See how your café is performing over time, which days are
-            busiest, and how guests are paying.
+          <p className="text-sm text-[#94A3B8]">
+            Practical signals to decide staffing, promos, and priorities.
           </p>
         </div>
 
         <PeriodSelector value={range} onChange={setRange} />
       </div>
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
-        <KpiCard
-          label={`Revenue (${periodLabel})`}
-          value={totalRevenue}
-          changePct={trendPct}
-          changeLabel="vs previous period"
-          delay={0}
-        />
+      {/* At-a-glance health */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0B1220]">At-a-glance health</h3>
+          <p className="text-xs text-[#94A3B8]">Key signals for this period</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+          <KpiCard
+            label={`Revenue (${periodLabel})`}
+            value={totalRevenue}
+            changePct={trendPct}
+            changeLabel="vs previous period"
+            delay={0}
+          />
 
-        <KpiCard
-          label="Average daily revenue"
-          value={avgDailyRevenue}
-          changePct={null}
-          delay={80}
-        />
+          <KpiCard
+            label="Average daily revenue"
+            value={avgDailyRevenue}
+            changePct={null}
+            delay={80}
+          />
 
-        <AnimatedCard delay={160}>
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Best-performing day
-          </p>
-          <p className="text-2xl font-semibold text-slate-50">
-            {bestWeekdayLabel ?? '—'}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Based on revenue over the selected period.
-          </p>
-        </AnimatedCard>
+          <AnimatedCard delay={160}>
+            <p className="text-xs font-medium text-[#94A3B8] mb-1">
+              Best-performing day
+            </p>
+            <p className="text-2xl font-semibold text-[#0B1220]">
+              {bestWeekdayLabel ?? 'No data'}
+            </p>
+            <p className="text-[11px] text-[#94A3B8] mt-2">
+              Based on revenue over the selected period.
+            </p>
+          </AnimatedCard>
 
-        <AnimatedCard delay={240}>
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Card vs cash share
-          </p>
-          <p className="text-sm text-slate-200">
-            Card:{' '}
-            <span className="font-semibold">
-              {cardTotal + cashTotal === 0
-                ? '—'
-                : `${Math.round(
-                    (cardTotal / (cardTotal + cashTotal)) * 100
-                  )}%`}
-            </span>{' '}
-            · Cash:{' '}
-            <span className="font-semibold">
-              {cardTotal + cashTotal === 0
-                ? '—'
-                : `${Math.round(
-                    (cashTotal / (cardTotal + cashTotal)) * 100
-                  )}%`}
-            </span>
-          </p>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Helps you track how guests prefer to pay.
-          </p>
-        </AnimatedCard>
-      </div>
+          {paymentTotal > 0 && (
+            <AnimatedCard delay={240}>
+              <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                Card vs cash share
+              </p>
+              <p className="text-sm text-[#0B1220]">
+                Card:{' '}
+                <span className="font-semibold">
+                  {cardSharePct == null ? 'No data' : `${cardSharePct}%`}
+                </span>{' '}
+                &middot; Cash:{' '}
+                <span className="font-semibold">
+                  {cashSharePct == null ? 'No data' : `${cashSharePct}%`}
+                </span>
+              </p>
+              <p className="text-[11px] text-[#94A3B8] mt-2">
+                High card usage usually correlates with faster checkout.
+              </p>
+            </AnimatedCard>
+          )}
+        </div>
+      </section>
 
-      {/* main chart + donut */}
-      <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-4">
+      {/* Patterns that matter */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0B1220]">Patterns that matter</h3>
+          <p className="text-xs text-[#94A3B8]">Use this to plan staffing and promos</p>
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1.7fr] gap-4">
+          <AnimatedCard>
+            <p className="text-xs font-medium text-[#94A3B8] mb-2">
+              {range === '7d' ? 'Daily revenue totals' : 'Weekly revenue totals'}
+            </p>
+            <div className="h-56 sm:h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={range === '7d' ? series : weeklySeries}>
+                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={60}
+                    tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : v)}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} />
+                  <Bar dataKey="total" radius={[4, 4, 0, 0]} fill={CHART_COLORS.bars} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 text-[11px] text-[#94A3B8]">
+              {range === '7d'
+                ? 'Daily totals for the last week.'
+                : 'Weekly totals keep the trend readable without daily noise.'}
+            </p>
+          </AnimatedCard>
+
+          <AnimatedCard>
+            <p className="text-xs font-medium text-[#94A3B8] mb-2">Revenue by weekday</p>
+            <div className="h-56 sm:h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weekdayData}>
+                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={60}
+                    tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : v)}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} />
+                  <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                    {weekdayData.map((entry, idx) => (
+                      <Cell
+                        key={`cell-${entry.name}`}
+                        fill={
+                          idx === bestWeekdayIndex
+                            ? '#22C3A6'
+                            : idx === worstWeekdayIndex
+                            ? '#F59E0B'
+                            : CHART_COLORS.bars
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 text-[11px] text-[#94A3B8]">
+              Top and weakest days are highlighted automatically.
+            </p>
+          </AnimatedCard>
+        </div>
+      </section>
+
+      {/* Actionable insight blocks */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0B1220]">Actionable insights</h3>
+          <p className="text-xs text-[#94A3B8]">Suggested actions for next week</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {insightCards.length ? (
+            insightCards.slice(0, 3).map((insight) => (
+              <AnimatedCard key={insight.title}>
+                <p className="text-sm font-semibold text-[#0B1220]">{insight.title}</p>
+                <p className="mt-2 text-xs text-[#94A3B8]">{insight.action}</p>
+              </AnimatedCard>
+            ))
+          ) : (
+            <AnimatedCard>
+              <p className="text-sm font-semibold text-[#0B1220]">No clear patterns yet</p>
+              <p className="mt-2 text-xs text-[#94A3B8]">Add a few more weeks of sales to surface actionable insights.</p>
+            </AnimatedCard>
+          )}
+        </div>
+      </section>
+
+      {/* Standout days */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0B1220]">Standout days (what happened here?)</h3>
+          <p className="text-xs text-[#94A3B8]">Use notes to capture weather, events, promos</p>
+        </div>
         <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-2">
-            Revenue over time
-          </p>
-          <div className="h-56 sm:h-60 lg:h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series}>
-                <defs>
-                  <linearGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={CHART_COLORS.line}
-                      stopOpacity={0.4}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={CHART_COLORS.lineFaint}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  stroke="#1e293b"
-                  strokeDasharray="3 3"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={16}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={60}
-                  tickFormatter={(v) =>
-                    v >= 1000 ? `${Math.round(v / 1000)}k` : v
-                  }
-                />
-                <Tooltip content={<CustomLineTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="total"
-                  stroke={CHART_COLORS.line}
-                  strokeWidth={2}
-                  fill="url(#revArea)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-500">
-            Shows daily revenue for the selected period.
-          </p>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-2">
-            Cash vs card revenue
-          </p>
-          <div className="h-56 sm:h-64 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {donutData.map((entry, idx) => (
-                    <Cell key={idx} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }: any) => {
-                    if (!active || !payload?.length) return null;
-                    const p = payload[0];
-                    return (
-                      <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
-                        <div className="font-medium mb-1">
-                          {p.name}
-                        </div>
-                        <div>{formatCurrencyAUD(p.value ?? 0)}</div>
-                      </div>
-                    );
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-500">
-            Useful for reconciling your till and POS.
-          </p>
-        </AnimatedCard>
-      </div>
-
-      {/* weekday chart + top days table */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1.7fr] gap-4">
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-2">
-            Revenue by weekday
-          </p>
-          <div className="h-56 sm:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weekdayData}>
-                <CartesianGrid
-                  stroke="#1e293b"
-                  strokeDasharray="3 3"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={60}
-                  tickFormatter={(v) =>
-                    v >= 1000 ? `${Math.round(v / 1000)}k` : v
-                  }
-                />
-                <Tooltip
-                  content={({ active, payload }: any) => {
-                    if (!active || !payload?.length) return null;
-                    const p = payload[0];
-                    return (
-                      <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
-                        <div className="font-medium mb-1">
-                          {p.payload.name}
-                        </div>
-                        <div>{formatCurrencyAUD(p.value ?? 0)}</div>
-                      </div>
-                    );
-                  }}
-                />
-                <Bar
-                  dataKey="total"
-                  radius={[4, 4, 0, 0]}
-                  fill={CHART_COLORS.bars}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-500">
-            Helps you plan rostering and promos around your busiest days.
-          </p>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-2">
-            Highest revenue days
-          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr className="text-slate-400 border-b border-slate-800">
+                <tr className="text-[#94A3B8] border-b border-[#E2E8F0]">
                   <th className="py-2 pr-4">Date</th>
                   <th className="py-2 pr-4">Revenue</th>
-                  <th className="py-2 pr-4 hidden sm:table-cell">vs daily avg</th>
                   <th className="py-2 pr-4 hidden md:table-cell">Notes</th>
                 </tr>
               </thead>
               <tbody>
-                {topDays.map((day) => {
-                  const diff = day.revenue - avgForPeriod;
-                  const pct =
-                    avgForPeriod > 0 ? (diff / avgForPeriod) * 100 : null;
-                  const positive = (pct ?? 0) >= 0;
-
-                  return (
-                    <tr
-                      key={day.id}
-                      className="border-b border-slate-900 last:border-0"
-                    >
-                      <td className="py-2 pr-4 whitespace-nowrap text-slate-200">
-                        {day.formattedDate}
-                      </td>
-                      <td className="py-2 pr-4 text-slate-50">
-                        {formatCurrencyAUD(day.revenue)}
-                      </td>
-                      <td className="py-2 pr-4 hidden sm:table-cell">
-                        {pct == null ? (
-                          '—'
-                        ) : (
-                          <span
-                            className={
-                              positive
-                                ? 'text-emerald-400'
-                                : 'text-rose-400'
-                            }
-                          >
-                            {positive ? '▲' : '▼'}{' '}
-                            {Math.abs(pct).toFixed(1)}%
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4 max-w-xs truncate text-slate-400 hidden md:table-cell">
-                        {day.notes ?? '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {topDays.map((day) => (
+                  <tr
+                    key={day.id}
+                    className="border-b border-[#E2E8F0] last:border-0"
+                  >
+                    <td className="py-2 pr-4 whitespace-nowrap text-[#0B1220]">
+                      {day.formattedDate}
+                    </td>
+                    <td className="py-2 pr-4 text-[#0B1220]">
+                      {formatCurrencyAUD(day.revenue)}
+                    </td>
+                    <td className="py-2 pr-4 max-w-xs truncate text-[#94A3B8] hidden md:table-cell">
+                      {day.notes ?? 'No notes'}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">
-            Use this to remember what was happening on standout days
-            (weather, events, promos, etc.).
-          </p>
         </AnimatedCard>
-      </div>
+      </section>
 
       {errorMessage && (
-        <p className="text-xs text-rose-400 mt-2">{errorMessage}</p>
+        <p className="text-xs text-[#EF4444] mt-2">{errorMessage}</p>
       )}
 
       {ENABLE_ANALYTICS_DEBUG && (
@@ -810,3 +739,8 @@ export default function SalesAnalyticsPage() {
     </section>
   );
 }
+
+
+
+
+

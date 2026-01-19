@@ -108,22 +108,22 @@ export default function ImportCsvModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-3">
-      <div className="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 p-4 md:p-6 shadow-xl">
+      <div className="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white border border-[#E2E8F0] p-4 md:p-6 shadow-xl">
         {/* Toast */}
         {toast && (
           <div className="absolute top-3 right-3">
             <div
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs shadow-lg transform transition-all ${
                 toast.type === "success"
-                  ? "bg-emerald-600 text-emerald-50"
-                  : "bg-red-600 text-red-50"
+                  ? "bg-[#22C3A6] text-[#0B1220]"
+                  : "bg-[#EF4444] text-[#0B1220]"
               }`}
             >
               <span
                 className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
                   toast.type === "success"
-                    ? "bg-emerald-500"
-                    : "bg-red-500"
+                    ? "bg-[#17A98F]"
+                    : "bg-[#EF4444]"
                 }`}
               >
                 ✓
@@ -136,10 +136,10 @@ export default function ImportCsvModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">
+            <h3 className="text-sm font-semibold text-[#0B1220]">
               Import sales from CSV
             </h3>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-[#94A3B8]">
               Upload a CSV with one row per day. We’ll validate before
               saving.
             </p>
@@ -148,7 +148,7 @@ export default function ImportCsvModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-slate-400 hover:text-slate-200"
+            className="text-xs text-[#94A3B8] hover:text-[#0B1220]"
           >
             Close
           </button>
@@ -158,19 +158,19 @@ export default function ImportCsvModal({
         <div
           className={`space-y-2 mb-4 rounded-lg border p-4 transition-colors ${
             isDragging
-              ? "border-sky-500 bg-sky-500/10"
-              : "border-slate-800 bg-slate-900/40"
+              ? "border-[#22C3A6] bg-[#22C3A6]/10"
+              : "border-[#E2E8F0] bg-white"
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <label className="text-xs font-medium text-slate-300">
+          <label className="text-xs font-medium text-[#94A3B8]">
             CSV file
           </label>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-900 border border-slate-700 text-xs font-medium text-slate-100 cursor-pointer hover:bg-slate-800">
+            <label className="inline-flex items-center px-3 py-1.5 rounded-md bg-white border border-[#E2E8F0] text-xs font-medium text-[#0B1220] cursor-pointer hover:bg-white">
               <span>Choose file</span>
               <input
                 type="file"
@@ -180,38 +180,38 @@ export default function ImportCsvModal({
               />
             </label>
 
-            <span className="text-xs text-slate-400 truncate max-w-xs">
+            <span className="text-xs text-[#94A3B8] truncate max-w-xs">
               {fileName ?? "No file chosen"}
             </span>
 
-            <span className="ml-auto text-[11px] text-slate-500">
+            <span className="ml-auto text-[11px] text-[#94A3B8]">
               Drag &amp; drop a CSV here, or click “Choose file”.
             </span>
           </div>
 
-          <div className="text-[11px] text-slate-500 leading-relaxed">
-            <div className="mt-2 space-y-1 text-[11px] text-slate-400">
+          <div className="text-[11px] text-[#94A3B8] leading-relaxed">
+            <div className="mt-2 space-y-1 text-[11px] text-[#94A3B8]">
             <div>
-                <span className="font-medium text-slate-300">Expected columns:</span>{' '}
-                <code className="px-1.5 py-0.5 rounded bg-slate-900/70 border border-slate-700/70">
+                <span className="font-medium text-[#94A3B8]">Expected columns:</span>{' '}
+                <code className="px-1.5 py-0.5 rounded bg-white border border-[#E2E8F0]/70">
                 sale_date, total_revenue, total_transactions, cash_revenue, card_revenue, notes
                 </code>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-medium text-slate-300">Date formats:</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700/80">
+                <span className="font-medium text-[#94A3B8]">Date formats:</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#F9FBFC] border border-[#E2E8F0]/80">
                 <code>YYYY-MM-DD</code>
-                <span className="ml-1 text-[10px] text-slate-500">(2025-10-31)</span>
+                <span className="ml-1 text-[10px] text-[#94A3B8]">(2025-10-31)</span>
                 </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700/80">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#F9FBFC] border border-[#E2E8F0]/80">
                 <code>DD/MM/YYYY</code>
-                <span className="ml-1 text-[10px] text-slate-500">(31/10/2025)</span>
+                <span className="ml-1 text-[10px] text-[#94A3B8]">(31/10/2025)</span>
                 </span>
             </div>
 
             <div>
-                <span className="font-medium text-slate-300">Revenue values:</span>{' '}
+                <span className="font-medium text-[#94A3B8]">Revenue values:</span>{' '}
                 use plain numbers (e.g. <code>400</code>, not <code>$400</code>).
             </div>
             </div>
@@ -221,11 +221,11 @@ export default function ImportCsvModal({
 
         {/* Errors – highlighted in red */}
         {errors.length > 0 && (
-          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/5 p-3">
-            <p className="text-xs font-semibold text-red-300 mb-1">
+          <div className="mb-4 rounded-lg border border-[#EF4444]/40 bg-[#EF4444]/5 p-3">
+            <p className="text-xs font-semibold text-[#EF4444] mb-1">
               Some rows could not be imported:
             </p>
-            <ul className="text-[11px] text-red-100 list-disc list-inside space-y-0.5 max-h-32 overflow-y-auto">
+            <ul className="text-[11px] text-[#0B1220] list-disc list-inside space-y-0.5 max-h-32 overflow-y-auto">
               {errors.slice(0, 10).map((err, i) => (
                 <li key={i}>{err}</li>
               ))}
@@ -238,15 +238,15 @@ export default function ImportCsvModal({
 
         {/* Preview table (valid rows) */}
         {rows.length > 0 && (
-          <div className="mb-4 border border-slate-800 rounded-lg bg-slate-900/60 p-3">
-            <p className="text-xs text-slate-300 mb-2">
+          <div className="mb-4 border border-[#E2E8F0] rounded-lg bg-[#F9FBFC] p-3">
+            <p className="text-xs text-[#94A3B8] mb-2">
               Previewing first {Math.min(rows.length, 5)} of {rows.length}{" "}
               valid rows:
             </p>
 
             <div className="overflow-x-auto">
               <table className="w-full text-[11px] text-left border-collapse">
-                <thead className="text-slate-400 border-b border-slate-800">
+                <thead className="text-[#94A3B8] border-b border-[#E2E8F0]">
                   <tr>
                     <th className="py-1 pr-2">Date</th>
                     <th className="py-1 pr-2">Total</th>
@@ -261,7 +261,7 @@ export default function ImportCsvModal({
                   {rows.slice(0, 5).map((row, i) => (
                     <tr
                       key={i}
-                      className="border-b border-slate-900 last:border-0"
+                      className="border-b border-[#E2E8F0] last:border-0"
                     >
                       <td className="py-1 pr-2 whitespace-nowrap">
                         {row.sale_date}
@@ -295,7 +295,7 @@ export default function ImportCsvModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-2 text-xs">
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-[#94A3B8]">
             {rows.length === 0
               ? "Select a CSV file to begin."
               : `Ready to import ${rows.length} valid row${
@@ -307,7 +307,7 @@ export default function ImportCsvModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-slate-600 text-slate-200 hover:bg-slate-800"
+              className="px-3 py-1.5 rounded-md border border-[#E2E8F0] text-[#0B1220] hover:bg-white"
             >
               Cancel
             </button>
@@ -318,8 +318,8 @@ export default function ImportCsvModal({
               disabled={saving || rows.length === 0}
               className={`px-4 py-1.5 rounded-md text-xs font-medium disabled:opacity-60 transition-colors ${
                 justImported
-                  ? "bg-emerald-600 hover:bg-emerald-500"
-                  : "bg-sky-600 hover:bg-sky-500"
+                  ? "bg-[#22C3A6] hover:bg-[#17A98F] text-[#0B1220]"
+                  : "bg-[#22C3A6] hover:bg-[#17A98F] text-[#0B1220]"
               }`}
             >
               {saving
@@ -334,3 +334,10 @@ export default function ImportCsvModal({
     </div>
   );
 }
+
+
+
+
+
+
+

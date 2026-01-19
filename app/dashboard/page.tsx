@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from 'react';
 import AnimatedCard, {
@@ -11,21 +11,15 @@ import {
   type SalesRow,
 } from '@/lib/analytics/sales';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
-import { SkeletonChart } from '@/components/ui/SkeletonChart';
-import { parseDate, formatDateAU } from '@/lib/date';
 import { ENABLE_ANALYTICS_DEBUG } from '@/lib/debug';
 import { DebugPanel } from '@/components/ui/DebugPanel';
+import { InsightCards } from "@/components/insights/InsightCards";
 
 // ---------- helpers ----------
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const d = parseDate(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return formatDateAU(dateStr);
-}
 
-function TrendLabel({
+
+function DeltaLabel({
   change,
   label,
 }: {
@@ -33,24 +27,49 @@ function TrendLabel({
   label: string;
 }) {
   if (change === null) {
-    return <span className="text-xs text-slate-400">— {label}</span>;
+    return (
+      <span className="text-xs text-[#94A3B8]">
+        No comparison yet {label}
+      </span>
+    );
   }
 
   const isUp = change >= 0;
-  const rounded = Math.abs(change).toFixed(1);
+  const rounded = Math.abs(change).toFixed(0);
 
   return (
     <span
       className={`inline-flex items-center gap-1 text-xs font-medium ${
-        isUp ? 'text-emerald-400' : 'text-rose-400'
+        isUp ? "text-[#22C3A6]" : "text-[#F59E0B]"
       }`}
     >
-      <span>{isUp ? '▲' : '▼'}</span>
+      <span>{isUp ? "Up" : "Down"}</span>
       <span>
-        {rounded}% {isUp ? 'higher' : 'lower'} {label}
+        {rounded}% {label}
       </span>
     </span>
   );
+}
+
+function confidenceLabel(level: "low" | "moderate" | "high") {
+  switch (level) {
+    case "high":
+      return "High confidence";
+    case "moderate":
+      return "Moderate confidence";
+    default:
+      return "Low confidence (limited data)";
+  }
+}
+
+function confidenceFromCount(
+  count: number,
+  moderateAt: number,
+  highAt: number
+): "low" | "moderate" | "high" {
+  if (count >= highAt) return "high";
+  if (count >= moderateAt) return "moderate";
+  return "low";
 }
 
 // Simple sparkline SVG (same as before)
@@ -79,7 +98,7 @@ function RevenueSparkline({ values }: { values: number[] }) {
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-16 text-sky-500/80"
+      className="w-full h-16 text-[#22C3A6]/80"
       aria-hidden="true"
     >
       <line
@@ -87,7 +106,7 @@ function RevenueSparkline({ values }: { values: number[] }) {
         y1={height - 6}
         x2={width}
         y2={height - 6}
-        className="stroke-slate-700"
+        className="stroke-[#E2E8F0]"
         strokeWidth={1}
         strokeDasharray="4 4"
       />
@@ -104,7 +123,7 @@ function RevenueSparkline({ values }: { values: number[] }) {
         cx={lastX}
         cy={lastY}
         r={3}
-        className="fill-sky-400 animate-pulse"
+        className="fill-[#22C3A6] animate-pulse"
       >
         <title>Most recent day</title>
       </circle>
@@ -112,31 +131,172 @@ function RevenueSparkline({ values }: { values: number[] }) {
   );
 }
 
+type InsightCard = {
+  id: string;
+  title: string;
+  kind: "signal" | "opportunity";
+  severity: "info" | "warn" | "error" | "success";
+  why: string;
+  action?: string[];
+};
+
+type ReviewVelocity = {
+  last7: number;
+  prev7: number;
+  deltaPct: number | null;
+  last30?: number;
+  prev30?: number;
+  delta30Pct?: number | null;
+};
+
+type ReviewSummary = {
+  total: number;
+  avgRating: number | null;
+  reviewVelocity: ReviewVelocity;
+};
+
+type OnboardingStatus =
+  | "account_created"
+  | "location_connected"
+  | "data_fetching"
+  | "first_insight_ready"
+  | "digest_confirmed"
+  | "preferences_set"
+  | "onboarding_complete";
+
+const ONBOARDING_STORAGE_KEY = "lp:onboarding:v1";
+const ONBOARDING_CHECKLIST_DISMISS_KEY = "lp:onboarding:checklist_dismissed";
+
+function OnboardingChecklist() {
+  const [visible, setVisible] = useState(false);
+  const [status, setStatus] = useState<OnboardingStatus | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const dismissed = window.localStorage.getItem(
+      ONBOARDING_CHECKLIST_DISMISS_KEY
+    );
+    if (dismissed === "true") return;
+
+    const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as { status?: OnboardingStatus };
+      if (parsed?.status) {
+        setStatus(parsed.status);
+        setVisible(true);
+      }
+    } catch {
+      return;
+    }
+  }, []);
+
+  if (!visible || !status) return null;
+
+  const isLocationConnected = [
+    "location_connected",
+    "data_fetching",
+    "first_insight_ready",
+    "digest_confirmed",
+    "preferences_set",
+    "onboarding_complete",
+  ].includes(status);
+
+  const isInsightReady = [
+    "first_insight_ready",
+    "digest_confirmed",
+    "preferences_set",
+    "onboarding_complete",
+  ].includes(status);
+
+  const isDigestQueued = [
+    "digest_confirmed",
+    "preferences_set",
+    "onboarding_complete",
+  ].includes(status);
+
+  return (
+    <div className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+            Onboarding checklist
+          </p>
+          <p className="mt-1 text-sm text-[#0B1220]">
+            Quick status for your first week on LocalPulse.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            window.localStorage.setItem(
+              ONBOARDING_CHECKLIST_DISMISS_KEY,
+              "true"
+            );
+            setVisible(false);
+          }}
+          className="text-xs text-[#94A3B8] hover:text-[#0B1220]"
+        >
+          Dismiss
+        </button>
+      </div>
+
+      <div className="mt-3 grid gap-2 text-xs text-[#94A3B8] sm:grid-cols-3">
+        <div
+          className={`rounded-xl border px-3 py-2 ${
+            isLocationConnected
+              ? "border-[#DCFCE7] bg-[#F0FDF4] text-[#166534]"
+              : "border-[#E2E8F0] bg-[#F9FBFC]"
+          }`}
+        >
+          {isLocationConnected ? "OK" : "."} Location connected
+        </div>
+        <div
+          className={`rounded-xl border px-3 py-2 ${
+            isInsightReady
+              ? "border-[#DCFCE7] bg-[#F0FDF4] text-[#166534]"
+              : "border-[#E2E8F0] bg-[#F9FBFC]"
+          }`}
+        >
+          {isInsightReady ? "OK" : "."} First insight generated
+        </div>
+        <div
+          className={`rounded-xl border px-3 py-2 ${
+            isDigestQueued
+              ? "border-[#DCFCE7] bg-[#F0FDF4] text-[#166534]"
+              : "border-[#E2E8F0] bg-[#F9FBFC]"
+          }`}
+        >
+          {isDigestQueued ? "OK" : "."} Weekly digest scheduled
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 // ---------- page ----------
 
 export default function DashboardOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [revenue7, setRevenue7] = useState(0);
-  const [revenue7Change, setRevenue7Change] =
-    useState<number | null>(null);
-
   const [revenue30, setRevenue30] = useState(0);
   const [revenue30Change, setRevenue30Change] =
     useState<number | null>(null);
 
   const [sparklineValues, setSparklineValues] = useState<number[]>([]);
-  const [lastSaleDate, setLastSaleDate] = useState<string | null>(null);
 
-  // mini-insights
-  const [coverage30, setCoverage30] = useState<number | null>(null);
-  const [activeDays30, setActiveDays30] = useState(0);
-  const [bestDayDate, setBestDayDate] = useState<string | null>(null);
-  const [bestDayRevenue, setBestDayRevenue] = useState(0);
-  const [avgTicket30, setAvgTicket30] = useState<number | null>(null);
+  // other insights
+  const [insightCards, setInsightCards] = useState<InsightCard[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       setLoading(true);
       setError(null);
@@ -163,6 +323,41 @@ export default function DashboardOverviewPage() {
       }
 
       const cafeId = cafe.id;
+
+      // Load insights
+      setInsightsLoading(true);
+      try {
+        const res = await fetch(`/api/insights/overview?windowDays=180`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Failed to load insights");
+        }
+
+        const cards = Array.isArray(json?.insightCards)
+          ? json.insightCards
+          : [];
+
+        if (!cancelled) {
+          setInsightCards(cards);
+          setReviewSummary(
+            json?.reviews && typeof json.reviews.total === "number"
+              ? (json.reviews as ReviewSummary)
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setInsightCards([]);
+          setReviewSummary(null);
+        }
+      } finally {
+        if (!cancelled) setInsightsLoading(false);
+      }
 
       // Load last 60 days of sales (enough for 30d window + previous 30d)
       const today = new Date();
@@ -198,29 +393,19 @@ export default function DashboardOverviewPage() {
       const rows = (sales ?? []) as SalesRow[];
 
       // Use central analytics engine
-      const insights7 = computeSalesInsights(rows, 7);
       const insights30 = computeSalesInsights(rows, 30);
-
-      setRevenue7(insights7.totalRevenue);
-      setRevenue7Change(insights7.revenueChangePct);
 
       setRevenue30(insights30.totalRevenue);
       setRevenue30Change(insights30.revenueChangePct);
 
       // Sparkline for last 30 days
       const revenueMap = new Map<string, number>();
-      const txMap = new Map<string, number>();
 
       for (const row of rows) {
         const date = row.sale_date;
         const existing = revenueMap.get(date) ?? 0;
         revenueMap.set(date, existing + (row.total_revenue ?? 0));
 
-        const tx =
-          row.total_transactions != null
-            ? Number(row.total_transactions)
-            : 0;
-        txMap.set(date, (txMap.get(date) ?? 0) + tx);
       }
 
       const spark: number[] = [];
@@ -231,53 +416,13 @@ export default function DashboardOverviewPage() {
       }
       setSparklineValues(spark);
 
-      // Most recent sale date
-      if (rows.length > 0) {
-        const latest = rows[rows.length - 1].sale_date;
-        setLastSaleDate(latest);
-      } else {
-        setLastSaleDate(null);
-      }
-
-      // ---- MINI-INSIGHTS (last 30 days) ----
-      let activeDays = 0;
-      let bestDay = '';
-      let bestRevenue = 0;
-      let totalTx30 = 0;
-
-      for (let offset = 29; offset >= 0; offset--) {
-        const d = daysAgo(offset);
-        const key = d.toISOString().slice(0, 10);
-
-        const dayRevenue = revenueMap.get(key) ?? 0;
-        const dayTx = txMap.get(key) ?? 0;
-
-        if (dayRevenue > 0) {
-          activeDays++;
-        }
-        if (dayRevenue > bestRevenue) {
-          bestRevenue = dayRevenue;
-          bestDay = key;
-        }
-
-        totalTx30 += dayTx;
-      }
-
-      const coverage =
-        activeDays > 0 ? (activeDays / 30) * 100 : null;
-      const avgTicket =
-        totalTx30 > 0 ? insights30.totalRevenue / totalTx30 : null;
-
-      setActiveDays30(activeDays);
-      setCoverage30(coverage);
-      setBestDayDate(bestDay || null);
-      setBestDayRevenue(bestRevenue);
-      setAvgTicket30(avgTicket);
-
       setLoading(false);
     }
 
     load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ---------- loading state (Task 2 polish) ----------
@@ -286,8 +431,8 @@ export default function DashboardOverviewPage() {
     return (
       <section className="space-y-6">
         <div className="space-y-2">
-          <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
-          <div className="h-3 w-64 bg-slate-900 rounded animate-pulse" />
+          <div className="h-5 w-32 bg-[#E2E8F0] rounded animate-pulse" />
+          <div className="h-3 w-64 bg-[#E2E8F0] rounded animate-pulse" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6">
@@ -296,9 +441,10 @@ export default function DashboardOverviewPage() {
           <SkeletonCard />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
-          <SkeletonChart height={120} />
-          <SkeletonChart height={120} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       </section>
     );
@@ -308,184 +454,306 @@ export default function DashboardOverviewPage() {
 
   if (error) {
     return (
-      <section className="border border-rose-800/60 rounded-xl bg-slate-950/60 p-6">
-        <p className="text-sm text-rose-300">{error}</p>
+      <section className="border border-[#EF4444]/40 rounded-xl bg-white p-6">
+        <p className="text-sm text-[#EF4444]">{error}</p>
       </section>
     );
   }
 
-  // ---------- main content ----------
+    // ---------- main content ----------
+  const hasReviewData = Boolean(reviewSummary?.total);
+  const reviewVelocity = reviewSummary?.reviewVelocity ?? null;
+  const reviewCount30 = reviewVelocity?.last30 ?? reviewSummary?.total ?? 0;
+  const reviewDelta30 = reviewVelocity?.delta30Pct ?? null;
+  const reviewConfidence = confidenceFromCount(
+    reviewSummary?.total ?? 0,
+    10,
+    30
+  );
+  const velocityConfidence = confidenceFromCount(reviewCount30, 10, 30);
+
+  const revenueCoverage = sparklineValues.filter((value) => value > 0).length;
+  const hasRevenueData = revenue30 > 0 && revenueCoverage > 0;
+  const revenueConfidence = confidenceFromCount(revenueCoverage, 10, 20);
+  const sparklineHasData = sparklineValues.some((value) => value > 0);
+
+  const hasAnyData = hasReviewData || hasRevenueData || revenueCoverage > 0;
+  const anyLowConfidence =
+    (hasReviewData && reviewConfidence === "low") ||
+    (hasReviewData && velocityConfidence === "low") ||
+    (hasRevenueData && revenueConfidence === "low");
+  const primaryAlert = insightCards.find((card) => card.severity === "warn") ?? null;
+
+  const signalOrder = [
+    "rating_gap",
+    "reviews_summary",
+    "low_review_volume",
+    "velocity_drop",
+    "rating_sentiment_mismatch",
+    "recurring_complaint",
+    "no_reviews",
+    "competitor_benchmark_ready",
+  ];
+
+  const rankedSignals = insightCards
+    .filter((card) => card.kind === "signal")
+    .sort((a, b) => {
+      const aRank = signalOrder.indexOf(a.id);
+      const bRank = signalOrder.indexOf(b.id);
+      const aScore = aRank === -1 ? signalOrder.length : aRank;
+      const bScore = bRank === -1 ? signalOrder.length : bRank;
+      return aScore - bScore;
+    });
+
+  const focusFromSignals = rankedSignals
+    .map((card) => {
+      switch (card.id) {
+        case "rating_gap":
+          return {
+            text: "Review top complaints and adjust service by Friday.",
+            linkedTo: "Competitors have a higher average rating",
+          };
+        case "reviews_summary":
+          return {
+            text: "Respond to 3 recent reviews within 48 hours.",
+            linkedTo: "Reviews summary",
+          };
+        case "low_review_volume":
+          return {
+            text: "Aim for 10 reviews by next Sunday.",
+            linkedTo: "Not enough reviews yet to draw conclusions",
+          };
+        case "velocity_drop":
+          return {
+            text: "Ask for reviews during off-peak hours this week.",
+            linkedTo: "Review volume is slowing",
+          };
+        case "recurring_complaint": {
+          const match = card.title.match(/"([^"]+)"/);
+          const phrase = match?.[1];
+          return {
+            text: phrase
+              ? `Address "${phrase}" feedback with staff by Friday.`
+              : "Address repeated feedback with staff by Friday.",
+            linkedTo: card.title,
+          };
+        }
+        case "rating_sentiment_mismatch":
+          return {
+            text: "Resolve one recurring complaint before Friday.",
+            linkedTo: "High ratings but negative themes detected",
+          };
+        case "no_reviews":
+          return {
+            text: "Connect Google reviews by Friday to unlock insights.",
+            linkedTo: "No reviews yet",
+          };
+        default:
+          return null;
+      }
+    })
+    .filter(
+      (item): item is { text: string; linkedTo: string } => Boolean(item)
+    );
+
+  const fallbackFocus = [
+    hasReviewData
+      ? { text: "Respond to 3 recent reviews within 48 hours." }
+      : { text: "Connect Google reviews by Friday to unlock insights." },
+    hasRevenueData
+      ? { text: "Confirm daily sales entries by end of day this week." }
+      : { text: "Add sales entries for each trading day this week." },
+  ];
+
+  const focusSource = focusFromSignals.length ? focusFromSignals : fallbackFocus;
+  const focusList = focusSource
+    .filter((item, index) => focusSource.indexOf(item) === index)
+    .slice(0, anyLowConfidence ? 2 : 3);
+
+  const showInsights = (insightsLoading || insightCards.length > 0) && hasAnyData;
 
   return (
-    <section className="space-y-6">
-      {/* Header */}
+    <section className="space-y-8">
+      <OnboardingChecklist />
       <header>
         <h2 className="text-lg font-semibold">Overview</h2>
-        <p className="mt-1 text-sm text-slate-400 max-w-2xl">
-          This is your Local Pulse overview. As you add sales (and
-          later, reviews), this panel shows key metrics for your café
-          at a glance.
+        <p className="mt-1 text-sm text-[#94A3B8] max-w-2xl">
+          This is your LocalPulse overview. As you add sales (and later,
+          reviews), this panel shows the key signals for your cafe at a glance.
         </p>
       </header>
 
-      {/* Top row: three primary cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6">
-        <AnimatedCardGroup>
-          <AnimatedCard variant="scale" glass>
-            <p className="text-xs font-medium text-slate-400 mb-1">
-              Revenue (last 7 days)
-            </p>
-
-            <AnimatedNumber
-              value={revenue7}
-              prefix="A"
-              className="text-2xl font-semibold text-slate-50"
-            />
-
-            <div className="mt-3 flex items-center justify-between">
-              <TrendLabel
-                change={revenue7Change}
-                label="vs previous 7 days"
-              />
-            </div>
-          </AnimatedCard>
-
-          <AnimatedCard variant="scale" glass>
-            <p className="text-xs font-medium text-slate-400 mb-1">
-              Revenue (last 30 days)
-            </p>
-
-            <AnimatedNumber
-              value={revenue30}
-              prefix="A"
-              className="text-2xl font-semibold text-slate-50"
-            />
-
-            <div className="mt-3">
-              <RevenueSparkline values={sparklineValues} />
-            </div>
-
-            <div className="mt-2 flex items-center justify-between">
-              <TrendLabel
-                change={revenue30Change}
-                label="vs previous 30 days"
-              />
-              <span className="text-[11px] text-slate-500">
-                Sparkline shows daily revenue over the last 30 days.
-              </span>
-            </div>
-          </AnimatedCard>
-
-          <AnimatedCard>
-            <p className="text-xs font-medium text-slate-400 mb-1">
-              Most recent sales entry
-            </p>
-            <p className="text-xl font-semibold text-slate-50">
-              {lastSaleDate
-                ? formatDate(lastSaleDate)
-                : 'No sales yet'}
-            </p>
-            <p className="mt-3 text-xs text-slate-400">
-              Keep this up to date to make your trends accurate.
-            </p>
-          </AnimatedCard>
-        </AnimatedCardGroup>
-      </div>
-
-      {/* NEW: mini-insights row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-6">
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Data coverage (last 30 days)
-          </p>
-          <p className="text-xl font-semibold text-slate-50">
-            {coverage30 != null ? `${coverage30.toFixed(0)}%` : '—'}
-          </p>
-          <p className="mt-2 text-xs text-slate-400">
-            {activeDays30} of 30 days have at least one sales
-            entry logged.
-          </p>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Best day (last 30 days)
-          </p>
-          <p className="text-sm font-semibold text-slate-50">
-            {bestDayDate ? formatDate(bestDayDate) : '—'}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            {bestDayRevenue > 0
-              ? `Revenue: A$${bestDayRevenue.toLocaleString('en-AU', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : 'Add more sales to see your standout days.'}
-          </p>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Avg ticket size (last 30 days)
-          </p>
-          <p className="text-xl font-semibold text-slate-50">
-            {avgTicket30 != null
-              ? `A$${avgTicket30.toLocaleString('en-AU', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : '—'}
-          </p>
-          <p className="mt-2 text-xs text-slate-400">
-            Based on total revenue ÷ total transactions where
-            transactions were recorded.
-          </p>
-        </AnimatedCard>
-      </div>
-
-      {/* Bottom row: reviews placeholders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Reviews (last 30 days)
-          </p>
-          <p className="text-sm text-slate-400">
-            Once you connect Local Pulse to your reviews source,
-            we&apos;ll show your average rating, review count, and
-            change over time here.
-          </p>
-          <div className="mt-4 h-16 rounded-lg border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Reviews integration coming soon
-          </div>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0B1220]">Health snapshot</h3>
+          <p className="text-xs text-[#94A3B8]">Should I worry today?</p>
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-400 mb-1">
-            Latest review highlight
-          </p>
-          <p className="text-sm text-slate-400">
-            When new reviews come in, we&apos;ll surface a recent
-            comment here so you can quickly see what guests are saying.
-          </p>
-          <div className="mt-4 h-16 rounded-lg border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Waiting for your first review
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 xl:gap-6">
+          <AnimatedCardGroup>
+            {!hasAnyData && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+                  Connect your data to unlock insights
+                </p>
+                <ul className="mt-3 space-y-2 text-xs text-[#94A3B8] list-disc list-inside">
+                  <li>Add sales entries</li>
+                  <li>Connect Google reviews</li>
+                  <li>Invite staff (later)</li>
+                </ul>
+              </AnimatedCard>
+            )}
+
+            {hasAnyData && hasReviewData && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Rating & reviews (last 180 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {reviewSummary?.avgRating != null
+                    ? `${reviewSummary.avgRating.toFixed(1)} stars`
+                    : `${reviewSummary?.total ?? 0} reviews`}
+                </p>
+                <p className="mt-2 text-xs text-[#94A3B8]">
+                  {reviewSummary?.total ?? 0} reviews in the last 180 days.
+                </p>
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  {confidenceLabel(reviewConfidence)}
+                </p>
+              </AnimatedCard>
+            )}
+
+            {hasAnyData && hasReviewData && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Review velocity (last 30 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {reviewCount30} reviews
+                </p>
+                {anyLowConfidence ? (
+                  <p className="mt-2 text-xs text-[#94A3B8]">
+                    Review activity is limited this period.
+                  </p>
+                ) : reviewCount30 === 0 ? (
+                  <p className="mt-2 text-xs text-[#94A3B8]">
+                    No reviews in the last 30 days.
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <DeltaLabel change={reviewDelta30} label="vs previous 30 days" />
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  {confidenceLabel(velocityConfidence)}
+                </p>
+              </AnimatedCard>
+            )}
+
+            {hasAnyData && hasRevenueData && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Revenue trend (last 30 days)
+                </p>
+                <AnimatedNumber
+                  value={revenue30}
+                  prefix="A"
+                  className="text-2xl font-semibold text-[#0B1220]"
+                />
+                {sparklineHasData && !anyLowConfidence && (
+                  <div className="mt-3">
+                    <RevenueSparkline values={sparklineValues} />
+                  </div>
+                )}
+                {anyLowConfidence ? (
+                  <p className="mt-2 text-xs text-[#94A3B8]">
+                    Revenue activity is limited this period.
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <DeltaLabel change={revenue30Change} label="vs previous 30 days" />
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  {confidenceLabel(revenueConfidence)}
+                </p>
+              </AnimatedCard>
+            )}
+
+            {hasAnyData && revenueCoverage === 0 && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Connect sales to track revenue trends
+                </p>
+                <p className="text-sm text-[#94A3B8]">
+                  Add daily sales entries to unlock revenue insights here.
+                </p>
+              </AnimatedCard>
+            )}
+
+            {hasAnyData && primaryAlert && (
+              <AnimatedCard>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Needs attention
+                </p>
+                <p className="text-sm font-semibold text-[#0B1220]">
+                  {primaryAlert.title}
+                </p>
+                <p className="mt-2 text-xs text-[#94A3B8]">
+                  {primaryAlert.why}
+                </p>
+              </AnimatedCard>
+            )}
+          </AnimatedCardGroup>
         </div>
-      </div>
+      </section>
+
+      {showInsights && (
+        <InsightCards loading={insightsLoading} cards={insightCards} />
+      )}
+
+      {hasAnyData && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#0B1220]">This week&apos;s focus</h3>
+            <p className="text-xs text-[#94A3B8]">
+              {anyLowConfidence ? "Max 2 items" : "Max 3 items"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <ul className="space-y-2 text-sm text-[#0B1220] list-disc list-inside">
+              {focusList.map((item) => (
+                <li key={item.text}>
+                  {item.text}
+                  {item.linkedTo && (
+                    <span className="mt-1 block text-[11px] text-[#94A3B8]">
+                      Linked to: {item.linkedTo}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {ENABLE_ANALYTICS_DEBUG && (
         <DebugPanel
           title="Overview debug"
           data={{
-            revenue7,
-            revenue7Change,
             revenue30,
             revenue30Change,
             sparklineValues,
-            lastSaleDate,
+            reviewSummary,
           }}
         />
       )}
     </section>
   );
 }
+
+
+
+
+
+

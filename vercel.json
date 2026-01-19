@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/digests/weekly?secret=${b226fd51-3c7a-491c-af55-be5556ba917b}",
+      "schedule": "0 8 * * 1"
+    }
+  ]
+}

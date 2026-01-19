@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { analyseReview } from "@/src/lib/sentiment/analyseReview";
 
 export const runtime = "nodejs";
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
+
 
 // For Places API (New) reviews, publishTime is an ISO string.
 // Use publishTime+author as a stable-ish external id.
@@ -85,7 +87,7 @@ export async function POST(_req: NextRequest) {
 
   // FieldMask controls what is returned (required on v1)
   const fieldMask =
-    "id,displayName,rating,userRatingCount,googleMapsUri,reviews";
+    "id,displayName,rating,userRatingCount,googleMapsUri,reviews,location,formattedAddress";
 
   const googleRes = await fetch(googleUrl, {
     method: "GET",
@@ -96,6 +98,19 @@ export async function POST(_req: NextRequest) {
   });
 
   const result = await googleRes.json().catch(() => null);
+  const loc = result?.location; // { latitude, longitude }
+  const formattedAddress: string | null = result?.formattedAddress ?? null;
+
+  if (loc?.latitude != null && loc?.longitude != null) {
+    await supabaseAdmin
+      .from("cafes")
+      .update({
+        lat: loc.latitude,
+        lng: loc.longitude,
+        address: formattedAddress,
+      })
+      .eq("id", cafeId);
+  }
 
   if (!googleRes.ok) {
     console.error("reviews/sync: Places API (New) error", result);
@@ -147,7 +162,28 @@ export async function POST(_req: NextRequest) {
     }
   }
 
-  // 7) Update review_sources metadata & last_synced_at
+// 6-7 filter new rows to update to avoid parsing repeat cells to sentiment
+// analyser. 
+const needsSentiment = rowsToUpsert.filter(r => r.text);
+
+// 7) Run sentiment only on reviews missing sentiment
+for (const review of needsSentiment) {
+  const sentiment = await analyseReview(review.text, review.rating);
+
+  await supabaseAdmin
+    .from("reviews")
+    .update({
+      sentiment_score: sentiment.score,
+      sentiment_label: sentiment.label,
+      sentiment_topics: sentiment.topics,
+      sentiment_version: sentiment.version,
+    })
+    .eq("external_review_id", review.external_review_id)
+    .eq("review_source_id", review.review_source_id);
+}
+
+
+  // 8) Update review_sources metadata & last_synced_at
   const { error: sourceUpdateError } = await supabaseAdmin
     .from("review_sources")
     .update({

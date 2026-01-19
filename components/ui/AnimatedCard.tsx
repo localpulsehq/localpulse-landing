@@ -11,6 +11,7 @@ type AnimatedCardProps = {
   hoverTilt?: boolean;
   glass?: boolean;
   shimmer?: boolean;
+  surface?: "default" | "gradient";
 };
 
 export default function AnimatedCard({
@@ -21,6 +22,7 @@ export default function AnimatedCard({
   hoverTilt = true,
   glass = false,
   shimmer = false,
+  surface = "default",
 }: AnimatedCardProps) {
   
   const animationClass = 
@@ -30,13 +32,18 @@ export default function AnimatedCard({
     ? "opacity-0 scale-[0.97] animate-card-scale-in"
     : "opacity-0 animate-card-in";
 
+  const baseClass =
+    surface === "gradient"
+      ? "rounded-xl p-4 md:p-5"
+      : "rounded-xl bg-white lp-card p-4 md:p-5";
+
   return (
     <div
       className={clsx(
-        "rounded-xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-sm",
+        baseClass,
         "opacity-0 animate-card-in",
         "transition-transform transition-colors duration-200",
-        "hover:-translate-y-0.5 hover:border-sky-500/60 hover:shadow-lg hover:shadow-sky-500/10",
+        "hover:-translate-y-0.5 hover:border-[#22C3A6]/60 hover:shadow-lg hover:shadow-[#22C3A6]/10",
         className
       )}
       style={{ animationDelay: `${delay}ms` }}
@@ -92,3 +99,5 @@ export function AnimatedCardGroup({
     </>
   );
 }
+
+
