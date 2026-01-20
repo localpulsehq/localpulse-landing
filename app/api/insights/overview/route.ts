@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
   );
 
   const { data: reviews, error: reviewsError } = await supabase
-    .from("reviews")
+    .from("reviews" as any)
     .select("rating,text,review_created_at,sentiment_score,sentiment_label,sentiment_topics")
     .eq("cafe_id", cafeId)
     .gte("review_created_at", queryStart.toISOString())
