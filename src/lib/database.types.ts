@@ -115,6 +115,165 @@ export type Database = {
         }
         Relationships: []
       }
+      digest_insights: {
+        Row: {
+          action_items: string[] | null
+          created_at: string
+          deep_link: string | null
+          digest_run_id: string
+          id: string
+          insight_id: string
+          insight_type: string
+          metric_label: string | null
+          metric_value: string | null
+          severity: string
+          source_review_ids: string[] | null
+          summary: string
+          supporting_data: Json | null
+          title: string
+        }
+        Insert: {
+          action_items?: string[] | null
+          created_at?: string
+          deep_link?: string | null
+          digest_run_id: string
+          id?: string
+          insight_id: string
+          insight_type: string
+          metric_label?: string | null
+          metric_value?: string | null
+          severity: string
+          source_review_ids?: string[] | null
+          summary: string
+          supporting_data?: Json | null
+          title: string
+        }
+        Update: {
+          action_items?: string[] | null
+          created_at?: string
+          deep_link?: string | null
+          digest_run_id?: string
+          id?: string
+          insight_id?: string
+          insight_type?: string
+          metric_label?: string | null
+          metric_value?: string | null
+          severity?: string
+          source_review_ids?: string[] | null
+          summary?: string
+          supporting_data?: Json | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_insights_digest_run_id_fkey"
+            columns: ["digest_run_id"]
+            isOneToOne: false
+            referencedRelation: "digest_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_recipients: {
+        Row: {
+          clicked_at: string | null
+          created_at: string
+          digest_run_id: string
+          email: string
+          error: string | null
+          id: string
+          opened_at: string | null
+          resend_message_id: string | null
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          clicked_at?: string | null
+          created_at?: string
+          digest_run_id: string
+          email: string
+          error?: string | null
+          id?: string
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          clicked_at?: string | null
+          created_at?: string
+          digest_run_id?: string
+          email?: string
+          error?: string | null
+          id?: string
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_recipients_digest_run_id_fkey"
+            columns: ["digest_run_id"]
+            isOneToOne: false
+            referencedRelation: "digest_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_runs: {
+        Row: {
+          cafe_id: string
+          created_at: string
+          cta_url: string | null
+          generated_at: string
+          id: string
+          period_end: string
+          period_label: string | null
+          period_start: string
+          sent_at: string | null
+          status: string
+          window_days: number
+        }
+        Insert: {
+          cafe_id: string
+          created_at?: string
+          cta_url?: string | null
+          generated_at?: string
+          id?: string
+          period_end: string
+          period_label?: string | null
+          period_start: string
+          sent_at?: string | null
+          status?: string
+          window_days?: number
+        }
+        Update: {
+          cafe_id?: string
+          created_at?: string
+          cta_url?: string | null
+          generated_at?: string
+          id?: string
+          period_end?: string
+          period_label?: string | null
+          period_start?: string
+          sent_at?: string | null
+          status?: string
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_runs_cafe_id_fkey"
+            columns: ["cafe_id"]
+            isOneToOne: false
+            referencedRelation: "cafes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string | null
@@ -361,6 +520,36 @@ export type Database = {
           old_data?: Json | null
           sale_id?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          digest_day_of_week: number | null
+          digest_enabled: boolean
+          digest_hour: number | null
+          timezone: string
+          unsubscribed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          digest_day_of_week?: number | null
+          digest_enabled?: boolean
+          digest_hour?: number | null
+          timezone?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          digest_day_of_week?: number | null
+          digest_enabled?: boolean
+          digest_hour?: number | null
+          timezone?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

@@ -2,7 +2,11 @@ import Link from "next/link";
 import { MarketingFooter } from "@/components/marketing/Footer";
 import { MarketingHeader } from "@/components/marketing/Header";
 
-const proofCards = [
+const proofCards: Array<{
+  title: string;
+  body: string;
+  tone: "success" | "warn" | "error" | "info";
+}> = [
   {
     title: "Customers love your food",
     body: "Praise for menu quality shows up in 7 recent reviews.",

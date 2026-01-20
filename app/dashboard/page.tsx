@@ -556,7 +556,7 @@ export default function DashboardOverviewPage() {
       (item): item is { text: string; linkedTo: string } => Boolean(item)
     );
 
-  const fallbackFocus = [
+  const fallbackFocus: Array<{ text: string; linkedTo?: string }> = [
     hasReviewData
       ? { text: "Respond to 3 recent reviews within 48 hours." }
       : { text: "Connect Google reviews by Friday to unlock insights." },
@@ -565,7 +565,9 @@ export default function DashboardOverviewPage() {
       : { text: "Add sales entries for each trading day this week." },
   ];
 
-  const focusSource = focusFromSignals.length ? focusFromSignals : fallbackFocus;
+  const focusSource: Array<{ text: string; linkedTo?: string }> = focusFromSignals.length
+    ? focusFromSignals
+    : fallbackFocus;
   const focusList = focusSource
     .filter((item, index) => focusSource.indexOf(item) === index)
     .slice(0, anyLowConfidence ? 2 : 3);

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   await supabaseAdmin
-    .from("user_preferences" as any)
+    .from("user_preferences")
     .upsert({
       user_id: payload.userId,
       digest_enabled: false,

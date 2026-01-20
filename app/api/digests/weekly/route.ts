@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
     const ownerId = cafe.owner_id;
 
     const { data: prefs } = await supabaseAdmin
-      .from("user_preferences" as any)
+      .from("user_preferences")
       .select("digest_enabled,unsubscribed_at")
       .eq("user_id", ownerId)
       .maybeSingle();
@@ -208,7 +208,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: existing } = await supabaseAdmin
-      .from("digest_runs" as any)
+      .from("digest_runs")
       .select("id,sent_at")
       .eq("cafe_id", cafeId)
       .eq("period_start", periodStart.toISOString().slice(0, 10))
@@ -229,7 +229,7 @@ export async function GET(req: NextRequest) {
     let digestRun = existing ?? null;
     if (!digestRun) {
       const { data, error: digestRunError } = await supabaseAdmin
-        .from("digest_runs" as any)
+        .from("digest_runs")
         .insert({
           cafe_id: cafeId,
           period_start: periodStart.toISOString().slice(0, 10),
@@ -254,7 +254,7 @@ export async function GET(req: NextRequest) {
 
     let recipientRow = null as any;
     const { data: existingRecipient } = await supabaseAdmin
-      .from("digest_recipients" as any)
+      .from("digest_recipients")
       .select("*")
       .eq("digest_run_id", digestRun.id)
       .eq("user_id", ownerId)
@@ -268,7 +268,7 @@ export async function GET(req: NextRequest) {
       }
     } else {
       const { data, error: recipientError } = await supabaseAdmin
-        .from("digest_recipients" as any)
+        .from("digest_recipients")
         .insert({
           digest_run_id: digestRun.id,
           user_id: ownerId,
@@ -281,7 +281,7 @@ export async function GET(req: NextRequest) {
       if (recipientError || !data) {
         results.push({ cafeId, status: "failed", detail: "recipient_insert" });
         await supabaseAdmin
-          .from("digest_runs" as any)
+          .from("digest_runs")
           .update({ status: "failed" })
           .eq("id", digestRun.id);
         continue;
@@ -290,7 +290,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: reviews, error: reviewsError } = await supabaseAdmin
-      .from("reviews" as any)
+      .from("reviews")
       .select("id,rating,text,review_created_at,sentiment_score,sentiment_label,sentiment_topics")
       .eq("cafe_id", cafeId)
       .gte("review_created_at", reviewQueryStart.toISOString())
@@ -299,7 +299,7 @@ export async function GET(req: NextRequest) {
     if (reviewsError) {
       results.push({ cafeId, status: "failed", detail: "reviews_load" });
       await supabaseAdmin
-        .from("digest_runs" as any)
+        .from("digest_runs")
         .update({ status: "failed" })
         .eq("id", digestRun.id);
       continue;
@@ -554,7 +554,7 @@ export async function GET(req: NextRequest) {
     }));
 
     if (insightRows.length > 0) {
-      await supabaseAdmin.from("digest_insights" as any).insert(insightRows);
+      await supabaseAdmin.from("digest_insights").insert(insightRows);
     }
 
     const { render } = await import("@react-email/render");
@@ -578,7 +578,7 @@ export async function GET(req: NextRequest) {
 
     if (!resendKey) {
       await supabaseAdmin
-        .from("digest_runs" as any)
+        .from("digest_runs")
         .update({ status: "failed" })
         .eq("id", digestRun.id);
       results.push({ cafeId, status: "failed", detail: "missing_resend_key" });
@@ -602,11 +602,11 @@ export async function GET(req: NextRequest) {
     if (!sendRes.ok) {
       const error = await sendRes.json().catch(() => null);
       await supabaseAdmin
-        .from("digest_runs" as any)
+        .from("digest_runs")
         .update({ status: "failed" })
         .eq("id", digestRun.id);
       await supabaseAdmin
-        .from("digest_recipients" as any)
+        .from("digest_recipients")
         .update({ status: "failed", error: JSON.stringify(error) })
         .eq("id", recipientRow.id);
       results.push({ cafeId, status: "failed", detail: "resend_failed" });
@@ -615,11 +615,11 @@ export async function GET(req: NextRequest) {
 
     const sendData = await sendRes.json();
     await supabaseAdmin
-      .from("digest_runs" as any)
+      .from("digest_runs")
       .update({ status: "sent", sent_at: new Date().toISOString(), cta_url: ctaUrl })
       .eq("id", digestRun.id);
     await supabaseAdmin
-      .from("digest_recipients" as any)
+      .from("digest_recipients")
       .update({
         status: "sent",
         sent_at: new Date().toISOString(),

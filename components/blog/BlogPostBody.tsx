@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ComponentType } from "react";
 
-const postComponents: Record<string, ReturnType<typeof dynamic>> = {
+const postComponents: Record<string, ComponentType<any>> = {
   "turn-customer-feedback-into-weekly-fixes": dynamic(
     () => import("@/content/blog/customer-feedback-snapshot.mdx")
   ),

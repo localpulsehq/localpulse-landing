@@ -148,7 +148,7 @@ export async function POST(_req: NextRequest) {
   // 6) Upsert rows into reviews table with service-role client (bypass RLS)
   if (rowsToUpsert.length > 0) {
     const { error: upsertError } = await supabaseAdmin
-      .from("reviews" as any)
+      .from("reviews")
       .upsert(rowsToUpsert, {
         onConflict: "review_source_id,external_review_id",
       });
@@ -171,7 +171,7 @@ for (const review of needsSentiment) {
   const sentiment = await analyseReview(review.text, review.rating);
 
   await supabaseAdmin
-    .from("reviews" as any)
+    .from("reviews")
     .update({
       sentiment_score: sentiment.score,
       sentiment_label: sentiment.label,
