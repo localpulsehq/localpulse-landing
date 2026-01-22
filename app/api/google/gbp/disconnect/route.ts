@@ -17,6 +17,38 @@ export async function POST() {
 
   if (!cafe?.id) return NextResponse.json({ error: "Cafe not found" }, { status: 400 });
 
+  const { data: sources, error: sourceError } = await supabaseAdmin
+    .from("review_sources")
+    .select("id")
+    .eq("cafe_id", cafe.id)
+    .eq("platform", "google");
+
+  if (sourceError) {
+    return NextResponse.json({ error: "Failed to load review sources" }, { status: 500 });
+  }
+
+  const sourceIds = (sources ?? []).map((s) => s.id);
+
+  if (sourceIds.length > 0) {
+    const { error: deleteReviewsError } = await supabaseAdmin
+      .from("reviews")
+      .delete()
+      .in("review_source_id", sourceIds);
+
+    if (deleteReviewsError) {
+      return NextResponse.json({ error: "Failed to delete reviews" }, { status: 500 });
+    }
+
+    const { error: deleteSourcesError } = await supabaseAdmin
+      .from("review_sources")
+      .delete()
+      .in("id", sourceIds);
+
+    if (deleteSourcesError) {
+      return NextResponse.json({ error: "Failed to delete review sources" }, { status: 500 });
+    }
+  }
+
   const { error } = await supabaseAdmin
     .from("google_oauth_tokens")
     .delete()

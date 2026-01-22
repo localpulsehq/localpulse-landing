@@ -15,6 +15,7 @@ export function GoogleBusinessProfileCard() {
   // Optional: quick sanity check action
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   async function loadStatus() {
     setLoading(true);
@@ -57,11 +58,41 @@ export function GoogleBusinessProfileCard() {
       }
 
       const count = Array.isArray(json?.locations) ? json.locations.length : 0;
-      setCheckResult(`Success - found ${count} location(s).`);
+      if (count === 0) {
+        setCheckResult("No GBP locations found for this Google account.");
+      } else {
+        setCheckResult(`Success - found ${count} location(s).`);
+      }
     } catch (e: any) {
       setError(e?.message ?? "GBP test failed");
     } finally {
       setChecking(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!connected || disconnecting) return;
+    const confirmed = window.confirm(
+      "Disconnect Google Business Profile and remove all synced Google reviews?"
+    );
+    if (!confirmed) return;
+
+    setDisconnecting(true);
+    setError(null);
+    setCheckResult(null);
+
+    try {
+      const res = await fetch("/api/google/gbp/disconnect", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to disconnect GBP");
+      }
+      setConnected(false);
+      setCheckResult("Disconnected and cleared Google reviews.");
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to disconnect GBP");
+    } finally {
+      setDisconnecting(false);
     }
   }
 
@@ -112,13 +143,23 @@ export function GoogleBusinessProfileCard() {
             Connect GBP
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={loadStatus}
-            className="px-4 py-2 rounded-md bg-[#F9FBFC] lp-card-soft hover:bg-[#F9FBFC] text-sm text-[#0B1220]"
-          >
-            Refresh status
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={loadStatus}
+              className="px-4 py-2 rounded-md bg-[#F9FBFC] lp-card-soft hover:bg-[#F9FBFC] text-sm text-[#0B1220]"
+            >
+              Refresh status
+            </button>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="px-4 py-2 rounded-md border border-[#FEE2E2] text-sm font-medium text-[#DC2626] hover:bg-[#FEF2F2] disabled:opacity-60"
+            >
+              {disconnecting ? "Disconnecting..." : "Disconnect & clear reviews"}
+            </button>
+          </>
         )}
 
         <button
@@ -141,7 +182,7 @@ export function GoogleBusinessProfileCard() {
       )}
 
       <p className="mt-3 text-[11px] text-[#94A3B8]">
-        Tokens are stored server-side only. You can disconnect later (we’ll add that control).
+        Disconnecting removes GBP access and deletes synced Google reviews for this cafe.
       </p>
     </AnimatedCard>
   );

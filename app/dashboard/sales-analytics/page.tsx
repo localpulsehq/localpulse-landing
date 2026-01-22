@@ -139,6 +139,15 @@ function sum(arr: number[]) {
 
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_FULL = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 const CHART_COLORS = {
   bars: '#38bdf8',
@@ -346,7 +355,7 @@ export default function SalesAnalyticsPage() {
         if (weekdayTotals[i] > weekdayTotals[bestIdx]) bestIdx = i;
       }
       if (weekdayTotals[bestIdx] > 0) {
-        bestWeekdayLabel = `${WEEKDAYS[bestIdx]}s`;
+        bestWeekdayLabel = WEEKDAYS_FULL[bestIdx];
       }
     }
 
@@ -421,7 +430,7 @@ export default function SalesAnalyticsPage() {
   const insightCards = [
     bestWeekdayIndex >= 0
       ? {
-          title: `${WEEKDAYS[bestWeekdayIndex]}s drive ~${Math.round(
+          title: `${WEEKDAYS_FULL[bestWeekdayIndex]} drives ~${Math.round(
             (weekdayData[bestWeekdayIndex].total / totalWeekdayRevenue) * 100
           )}% of revenue`,
           action:
@@ -430,7 +439,7 @@ export default function SalesAnalyticsPage() {
       : null,
     worstWeekdayIndex >= 0
       ? {
-          title: `${WEEKDAYS[worstWeekdayIndex]} is consistently the weakest day`,
+          title: `${WEEKDAYS_FULL[worstWeekdayIndex]} is consistently the weakest day`,
           action: 'Candidate for a lunch special or promo next week.',
         }
       : null,

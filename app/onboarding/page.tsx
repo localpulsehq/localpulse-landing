@@ -140,11 +140,18 @@ export default function OnboardingPage() {
   const [gbpLocations, setGbpLocations] = useState<GbpLocation[]>([]);
   const [gbpLoading, setGbpLoading] = useState(false);
   const [selectedGbpName, setSelectedGbpName] = useState<string | null>(null);
+  const [pendingGbpRedirect, setPendingGbpRedirect] = useState(false);
 
   const [manualInput, setManualInput] = useState("");
   const [manualName, setManualName] = useState("");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationBusy, setLocationBusy] = useState(false);
+  const [reviewAccess, setReviewAccess] = useState<{
+    status: "idle" | "checking" | "ok" | "warn" | "error";
+    message?: string;
+    lastSyncLabel?: string;
+    reviewCount?: number;
+  }>({ status: "idle" });
 
   const [warmupSteps, setWarmupSteps] = useState<WarmupStep[]>([
     { id: "reviews", label: "Analyzing recent reviews", status: "pending" },
@@ -220,27 +227,43 @@ export default function OnboardingPage() {
     bootstrap();
   }, [router, state.email]);
 
-  useEffect(() => {
-    async function checkGbp() {
-      if (!cafeId) return;
-      if (DEV_ONBOARDING_BYPASS) {
+  async function loadGbpStatus() {
+    if (!cafeId) return;
+    if (DEV_ONBOARDING_BYPASS) {
+      setGbpConnected(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/google/gbp/status");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
         setGbpConnected(false);
         return;
       }
-      try {
-        const res = await fetch("/api/google/gbp/status");
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setGbpConnected(false);
-          return;
-        }
-        setGbpConnected(Boolean(json?.connected));
-      } catch {
-        setGbpConnected(false);
-      }
+      setGbpConnected(Boolean(json?.connected));
+    } catch {
+      setGbpConnected(false);
     }
+  }
 
-    checkGbp();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gbp") === "connected") {
+      setPendingGbpRedirect(true);
+      window.history.replaceState({}, "", "/onboarding");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!pendingGbpRedirect || !cafeId) return;
+    void loadGbpStatus();
+    void handleLoadGbpLocations();
+    setPendingGbpRedirect(false);
+  }, [pendingGbpRedirect, cafeId]);
+
+  useEffect(() => {
+    void loadGbpStatus();
   }, [cafeId]);
 
   const stepIndex = Math.min(Math.max(state.step, 0), steps.length - 1);
@@ -269,7 +292,7 @@ export default function OnboardingPage() {
   async function handleLoadGbpLocations() {
     if (DEV_ONBOARDING_BYPASS) {
       setGbpConnected(true);
-      setGbpLocations([
+      const demoLocations = [
         {
           name: "dev-location-1",
           title: "LocalPulse Demo Cafe",
@@ -281,7 +304,12 @@ export default function OnboardingPage() {
           },
           metadata: { placeId: "ChIJDEVPLACEID" },
         },
-      ]);
+      ];
+      setGbpLocations(demoLocations);
+      if (demoLocations.length === 1) {
+        setSelectedGbpName(demoLocations[0].name);
+        await handleConfirmGbpLocation(demoLocations[0]);
+      }
       return;
     }
     setGbpLoading(true);
@@ -292,7 +320,15 @@ export default function OnboardingPage() {
       if (!res.ok) {
         throw new Error(json?.error || "Failed to load locations.");
       }
-      setGbpLocations(Array.isArray(json?.locations) ? json.locations : []);
+      const locations = Array.isArray(json?.locations) ? json.locations : [];
+      setGbpLocations(locations);
+      if (locations.length === 0) {
+        setLocationError("No GBP locations found for this Google account.");
+      }
+      if (locations.length === 1) {
+        setSelectedGbpName(locations[0].name);
+        await handleConfirmGbpLocation(locations[0]);
+      }
     } catch (err: any) {
       setLocationError(err?.message ?? "Failed to load locations.");
     } finally {
@@ -300,7 +336,7 @@ export default function OnboardingPage() {
     }
   }
 
-  async function handleConfirmGbpLocation() {
+  async function handleConfirmGbpLocation(selectedOverride?: GbpLocation) {
     if (!cafeId) return;
     if (DEV_ONBOARDING_BYPASS) {
       updateState({
@@ -313,10 +349,15 @@ export default function OnboardingPage() {
           placeId: "ChIJDEVPLACEID",
         },
       });
+      setReviewAccess({
+        status: "ok",
+        message: "Reviews access confirmed (demo).",
+      });
       setLocationBusy(false);
       return;
     }
-    const selected = gbpLocations.find((loc) => loc.name === selectedGbpName);
+    const selected =
+      selectedOverride ?? gbpLocations.find((loc) => loc.name === selectedGbpName);
     if (!selected) {
       setLocationError("Select a location to continue.");
       return;
@@ -363,6 +404,7 @@ export default function OnboardingPage() {
         placeId,
       },
     });
+    void validateReviewAccess(true);
     setLocationBusy(false);
   }
 
@@ -377,6 +419,10 @@ export default function OnboardingPage() {
           name: manualName.trim() || "LocalPulse Demo Cafe",
           placeId: "ChIJDEVPLACEID",
         },
+      });
+      setReviewAccess({
+        status: "ok",
+        message: "Reviews access confirmed (demo).",
       });
       setLocationBusy(false);
       return;
@@ -432,7 +478,51 @@ export default function OnboardingPage() {
         placeId,
       },
     });
+    void validateReviewAccess(true);
     setLocationBusy(false);
+  }
+
+  async function validateReviewAccess(force = false) {
+    if (!force && !state.location?.placeId) return;
+    setReviewAccess({ status: "checking" });
+    try {
+      const res = await fetch("/api/reviews/sync", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Review sync failed.");
+      }
+      const count = json?.reviews_fetched ?? json?.inserted_or_updated ?? 0;
+      if (json?.source === "gbp" && json?.gbp_status === "ok") {
+        setReviewAccess({
+          status: "ok",
+          message: `Reviews access confirmed (${count} reviews).`,
+          lastSyncLabel: "just now",
+          reviewCount: count,
+        });
+        return;
+      }
+      if (json?.gbp_status === "no_location") {
+        setReviewAccess({
+          status: "warn",
+          message:
+            "Connected, but no matching GBP location found. Using Places fallback.",
+          lastSyncLabel: "just now",
+          reviewCount: count,
+        });
+        return;
+      }
+      setReviewAccess({
+        status: "warn",
+        message: `Using Places fallback (limited). Found ${count} reviews.`,
+        lastSyncLabel: "just now",
+        reviewCount: count,
+      });
+    } catch (err: any) {
+      setReviewAccess({
+        status: "error",
+        message: err?.message ?? "Review sync failed.",
+      });
+    }
   }
 
   function updateWarmup(id: WarmupStep["id"], patch: Partial<WarmupStep>) {
@@ -670,7 +760,10 @@ export default function OnboardingPage() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => (window.location.href = "/api/google/gbp/start")}
+                          onClick={() =>
+                            (window.location.href =
+                              "/api/google/gbp/start?next=/onboarding?gbp=connected")
+                          }
                           className="rounded-full bg-[#22C3A6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#17A98F]"
                         >
                           Connect GBP
@@ -790,6 +883,58 @@ export default function OnboardingPage() {
                   {state.location && (
                     <div className="rounded-2xl border border-[#DCFCE7] bg-[#F0FDF4] px-4 py-3 text-xs text-[#166534]">
                       Location connected: {state.location.name ?? "Your cafe"}.
+                    </div>
+                  )}
+
+                  {state.location?.placeId && (
+                    <div className="rounded-2xl border border-[#E2E8F0] bg-[#F9FBFC] px-4 py-3 text-xs text-[#94A3B8]">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+                            Review access check
+                          </p>
+                          <p className="mt-1 text-xs text-[#94A3B8]">
+                            Confirms GBP reviews are accessible for this location.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={validateReviewAccess}
+                          disabled={reviewAccess.status === "checking"}
+                          className="rounded-full border border-[#E2E8F0] px-4 py-2 text-xs font-semibold text-[#0B1220] hover:bg-[#F9FBFC] disabled:opacity-60"
+                        >
+                          {reviewAccess.status === "checking"
+                            ? "Checking..."
+                            : "Verify reviews"}
+                        </button>
+                      </div>
+                      {reviewAccess.status !== "idle" && reviewAccess.message && (
+                        <p
+                          className={clsx(
+                            "mt-2 text-xs",
+                            reviewAccess.status === "ok"
+                              ? "text-[#22C3A6]"
+                              : reviewAccess.status === "warn"
+                              ? "text-[#F59E0B]"
+                              : reviewAccess.status === "error"
+                              ? "text-[#EF4444]"
+                              : "text-[#94A3B8]"
+                          )}
+                        >
+                          {reviewAccess.message}
+                        </p>
+                      )}
+                      {reviewAccess.status !== "idle" &&
+                        (reviewAccess.lastSyncLabel || reviewAccess.reviewCount != null) && (
+                          <p className="mt-1 text-[11px] text-[#94A3B8]">
+                            {reviewAccess.reviewCount != null
+                              ? `${reviewAccess.reviewCount} reviews`
+                              : ""}{" "}
+                            {reviewAccess.lastSyncLabel
+                              ? `· Last sync ${reviewAccess.lastSyncLabel}`
+                              : ""}
+                          </p>
+                        )}
                     </div>
                   )}
                 </div>

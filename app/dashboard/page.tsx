@@ -580,8 +580,7 @@ export default function DashboardOverviewPage() {
       <header>
         <h2 className="text-lg font-semibold">Overview</h2>
         <p className="mt-1 text-sm text-[#94A3B8] max-w-2xl">
-          This is your LocalPulse overview. As you add sales (and later,
-          reviews), this panel shows the key signals for your cafe at a glance.
+          A quick read on what changed and where to focus this week.
         </p>
       </header>
 

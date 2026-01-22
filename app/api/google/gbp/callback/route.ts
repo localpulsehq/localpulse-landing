@@ -94,5 +94,14 @@ export async function GET(req: NextRequest) {
   }
 
   // done
-  return NextResponse.redirect(`${APP_URL}/dashboard/settings?gbp=connected`);
+  const redirectCookie = req.cookies.get("gbp_redirect_to")?.value;
+  const redirectTo =
+    redirectCookie && redirectCookie.startsWith(APP_URL)
+      ? redirectCookie
+      : `${APP_URL}/dashboard/settings?gbp=connected`;
+
+  const res = NextResponse.redirect(redirectTo);
+  res.cookies.delete("gbp_redirect_to");
+  res.cookies.delete("gbp_oauth_state");
+  return res;
 }

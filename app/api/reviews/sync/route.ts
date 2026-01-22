@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { analyseReview } from "@/src/lib/sentiment/analyseReview";
+import { getValidGoogleAccessToken } from "@/src/lib/google/gbpTokens";
 
 export const runtime = "nodejs";
 
@@ -17,13 +18,72 @@ function makeExternalReviewId(r: any) {
   return `${author}-${text}`.slice(0, 255);
 }
 
-export async function POST(_req: NextRequest) {
-  if (!GOOGLE_PLACES_API_KEY) {
-    return NextResponse.json(
-      { error: "GOOGLE_PLACES_API_KEY is not configured" },
-      { status: 500 }
-    );
+function makeExternalReviewIdForGbp(r: any) {
+  return String(r?.reviewId ?? r?.name ?? r?.createTime ?? crypto.randomUUID());
+}
+
+function gbpStarRatingToNumber(value: string | null | undefined) {
+  switch (value) {
+    case "ONE":
+      return 1;
+    case "TWO":
+      return 2;
+    case "THREE":
+      return 3;
+    case "FOUR":
+      return 4;
+    case "FIVE":
+      return 5;
+    default:
+      return null;
   }
+}
+
+async function googleGet(url: string, accessToken: string) {
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const json = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, json };
+}
+
+async function findGbpLocationForPlaceId(
+  accessToken: string,
+  placeId: string
+) {
+  const accountsRes = await googleGet(
+    "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+    accessToken
+  );
+  if (!accountsRes.ok) return null;
+
+  const account = accountsRes.json?.accounts?.[0];
+  const accountName = account?.name as string | undefined;
+  if (!accountName) return null;
+
+  const locationsRes = await googleGet(
+    `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,metadata`,
+    accessToken
+  );
+  if (!locationsRes.ok) return null;
+
+  const locations: any[] = locationsRes.json?.locations ?? [];
+  const match = locations.find(
+    (loc) => loc?.metadata?.placeId && loc.metadata.placeId === placeId
+  );
+  if (!match) return null;
+  return {
+    name: match.name as string,
+    title: match.title as string | undefined,
+  };
+}
+
+export async function POST(_req: NextRequest) {
+  const hasPlacesKey = Boolean(GOOGLE_PLACES_API_KEY);
 
   const supabase = await createSupabaseServerClient();
 
@@ -80,70 +140,124 @@ export async function POST(_req: NextRequest) {
     );
   }
 
-  // 4) Call Places API (New)
-  const googleUrl = `https://places.googleapis.com/v1/places/${encodeURIComponent(
-    placeId
-  )}`;
+  // 4) Try GBP reviews API first (if connected), otherwise fallback to Places.
+  let rowsToUpsert: any[] = [];
+  let placeName: string | null = null;
+  let placeUrl: string | null = null;
+  let rating: number | null = null;
+  let totalRatings: number | null = null;
+  let usedGbp = false;
+  let gbpStatus: "unused" | "ok" | "no_location" | "failed" = "unused";
+
+  try {
+    const accessToken = await getValidGoogleAccessToken(cafeId);
+    const gbpLocation = await findGbpLocationForPlaceId(accessToken, placeId);
+
+    if (gbpLocation?.name) {
+      const reviewsRes = await googleGet(
+        `https://mybusiness.googleapis.com/v4/${gbpLocation.name}/reviews`,
+        accessToken
+      );
+
+      if (reviewsRes.ok) {
+        const gbpReviews: any[] = reviewsRes.json?.reviews ?? [];
+        placeName = gbpLocation.title ?? null;
+        usedGbp = true;
+        gbpStatus = "ok";
+
+        rowsToUpsert = gbpReviews.map((r) => ({
+          cafe_id: cafeId,
+          review_source_id: source.id,
+          external_review_id: makeExternalReviewIdForGbp(r),
+          rating: gbpStarRatingToNumber(r?.starRating) ?? 0,
+          author_name: r?.reviewer?.displayName ?? null,
+          text: r?.comment ?? null,
+          language: r?.reviewer?.profileLanguage ?? null,
+          review_created_at: r?.createTime ?? r?.updateTime ?? null,
+        }));
+      } else {
+        gbpStatus = "failed";
+      }
+    } else {
+      gbpStatus = "no_location";
+    }
+  } catch (err) {
+    console.warn("reviews/sync: GBP sync failed, falling back to Places", err);
+    gbpStatus = "failed";
+  }
+
+  if (rowsToUpsert.length === 0) {
+    if (!hasPlacesKey) {
+      return NextResponse.json(
+        { error: "GOOGLE_PLACES_API_KEY is not configured" },
+        { status: 500 }
+      );
+    }
+
+    // 4) Call Places API (New)
+    const googleUrl = `https://places.googleapis.com/v1/places/${encodeURIComponent(
+      placeId
+    )}`;
 
   // FieldMask controls what is returned (required on v1)
   const fieldMask =
-    "id,displayName,rating,userRatingCount,googleMapsUri,reviews,location,formattedAddress";
+    "displayName,rating,userRatingCount,googleMapsUri,reviews,location,formattedAddress";
 
-  const googleRes = await fetch(googleUrl, {
-    method: "GET",
-    headers: {
-      "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-      "X-Goog-FieldMask": fieldMask,
-    },
-  });
-
-  const result = await googleRes.json().catch(() => null);
-  const loc = result?.location; // { latitude, longitude }
-  const formattedAddress: string | null = result?.formattedAddress ?? null;
-
-  if (loc?.latitude != null && loc?.longitude != null) {
-    await supabaseAdmin
-      .from("cafes")
-      .update({
-        lat: loc.latitude,
-        lng: loc.longitude,
-        address: formattedAddress,
-      })
-      .eq("id", cafeId);
-  }
-
-  if (!googleRes.ok) {
-    console.error("reviews/sync: Places API (New) error", result);
-    return NextResponse.json(
-      {
-        error: "Google Places API (New) error",
-        details: result,
+    const googleRes = await fetch(googleUrl, {
+      method: "GET",
+      headers: {
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": fieldMask,
       },
-      { status: 502 }
-    );
+    });
+
+    const result = await googleRes.json().catch(() => null);
+    const loc = result?.location; // { latitude, longitude }
+    const formattedAddress: string | null = result?.formattedAddress ?? null;
+
+    if (loc?.latitude != null && loc?.longitude != null) {
+      await supabaseAdmin
+        .from("cafes")
+        .update({
+          lat: loc.latitude,
+          lng: loc.longitude,
+          address: formattedAddress,
+        })
+        .eq("id", cafeId);
+    }
+
+    if (!googleRes.ok) {
+      console.error("reviews/sync: Places API (New) error", result);
+      return NextResponse.json(
+        {
+          error: "Google Places API (New) error",
+          details: result,
+        },
+        { status: 502 }
+      );
+    }
+
+    // Places API (New) response shape (no data.status, no data.result)
+    const googleReviews: any[] = result?.reviews ?? [];
+
+    placeName = result?.displayName?.text ?? null;
+    placeUrl = result?.googleMapsUri ?? null;
+    rating = typeof result?.rating === "number" ? result.rating : null;
+    totalRatings =
+      typeof result?.userRatingCount === "number" ? result.userRatingCount : null;
+
+    // 5) Map into our reviews table payload
+    rowsToUpsert = googleReviews.map((r) => ({
+      cafe_id: cafeId,
+      review_source_id: source.id,
+      external_review_id: makeExternalReviewId(r),
+      rating: r?.rating ?? 0,
+      author_name: r?.authorAttribution?.displayName ?? null,
+      text: r?.text?.text ?? null,
+      language: r?.text?.languageCode ?? null,
+      review_created_at: r?.publishTime ?? null, // ISO string
+    }));
   }
-
-  // Places API (New) response shape (no data.status, no data.result)
-  const googleReviews: any[] = result?.reviews ?? [];
-
-  const placeName: string | null = result?.displayName?.text ?? null;
-  const placeUrl: string | null = result?.googleMapsUri ?? null;
-  const rating: number | null =
-    typeof result?.rating === "number" ? result.rating : null;
-  const totalRatings: number | null =
-    typeof result?.userRatingCount === "number" ? result.userRatingCount : null;
-
-  // 5) Map into our reviews table payload
-  const rowsToUpsert = googleReviews.map((r) => ({
-    cafe_id: cafeId,
-    review_source_id: source.id,
-    external_review_id: makeExternalReviewId(r),
-    rating: r?.rating ?? 0,
-    author_name: r?.authorAttribution?.displayName ?? null,
-    text: r?.text?.text ?? null,
-    language: r?.text?.languageCode ?? null,
-    review_created_at: r?.publishTime ?? null, // ISO string
-  }));
 
   // 6) Upsert rows into reviews table with service-role client (bypass RLS)
   if (rowsToUpsert.length > 0) {
@@ -202,6 +316,9 @@ for (const review of needsSentiment) {
     placeId,
     cafeId,
     inserted_or_updated: rowsToUpsert.length,
+    reviews_fetched: rowsToUpsert.length,
+    source: usedGbp ? "gbp" : "places",
+    gbp_status: gbpStatus,
     rating,
     total_ratings: totalRatings,
   });

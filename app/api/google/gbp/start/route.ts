@@ -11,7 +11,7 @@ function makeState() {
   return crypto.randomUUID();
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   if (!CLIENT_ID || !REDIRECT_URI || !APP_URL) {
     return NextResponse.json(
       { error: "Missing GOOGLE_OAUTH_* or NEXT_PUBLIC_APP_URL env vars" },
@@ -27,12 +27,7 @@ export async function GET(_req: NextRequest) {
   const state = makeState();
 
   // GBP / Business Profile scopes (we can adjust later)
-  const scopes = [
-    "https://www.googleapis.com/auth/business.manage",
-    "openid",
-    "email",
-    "profile",
-  ];
+  const scopes = ["https://www.googleapis.com/auth/business.manage"];
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", CLIENT_ID);
@@ -44,10 +39,20 @@ export async function GET(_req: NextRequest) {
   url.searchParams.set("state", state);
 
   // where to return after callback
-  url.searchParams.set("redirect_to", `${APP_URL}/dashboard/reviews`);
+  const next = req.nextUrl.searchParams.get("next");
+  const safeNext =
+    next && next.startsWith("/") ? `${APP_URL}${next}` : `${APP_URL}/dashboard/settings?gbp=connected`;
+  url.searchParams.set("redirect_to", safeNext);
 
   const res = NextResponse.redirect(url.toString());
   res.cookies.set("gbp_oauth_state", state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+    maxAge: 10 * 60,
+  });
+  res.cookies.set("gbp_redirect_to", safeNext, {
     httpOnly: true,
     sameSite: "lax",
     secure: true,

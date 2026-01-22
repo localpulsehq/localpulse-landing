@@ -63,6 +63,14 @@ export async function GET(_req: NextRequest) {
   );
 
   if (!accountsRes.ok) {
+    if (accountsRes.status >= 400 && accountsRes.status < 500) {
+      return NextResponse.json({
+        ok: true,
+        accounts: [],
+        locations: [],
+        note: "No GBP accounts available for this user.",
+      });
+    }
     return NextResponse.json(
       { error: "Failed to list accounts", details: accountsRes.json },
       { status: 502 }
@@ -82,7 +90,7 @@ export async function GET(_req: NextRequest) {
 
   // 2) List locations (GBP Business Info API)
   const locationsRes = await googleGet(
-    `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,storefrontAddress,metadata,languageCode`,
+    `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,metadata`,
     accessToken
   );
 
