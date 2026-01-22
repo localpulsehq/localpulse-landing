@@ -408,6 +408,10 @@ export default function OnboardingPage() {
     setLocationBusy(false);
   }
 
+  const handleConfirmGbpLocationClick = () => {
+    void handleConfirmGbpLocation();
+  };
+
   async function handleManualConnect() {
     if (!cafeId) return;
     if (DEV_ONBOARDING_BYPASS) {
@@ -821,7 +825,7 @@ export default function OnboardingPage() {
 
                         <button
                           type="button"
-                          onClick={handleConfirmGbpLocation}
+                          onClick={handleConfirmGbpLocationClick}
                           disabled={!selectedGbpName || locationBusy}
                           className="mt-2 w-full rounded-xl bg-[#22C3A6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#17A98F] disabled:opacity-50"
                         >
@@ -899,7 +903,7 @@ export default function OnboardingPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={validateReviewAccess}
+                          onClick={() => void validateReviewAccess(true)}
                           disabled={reviewAccess.status === "checking"}
                           className="rounded-full border border-[#E2E8F0] px-4 py-2 text-xs font-semibold text-[#0B1220] hover:bg-[#F9FBFC] disabled:opacity-60"
                         >
