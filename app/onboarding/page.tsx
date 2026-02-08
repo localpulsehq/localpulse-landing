@@ -34,6 +34,7 @@ type OnboardingState = {
   step: number;
   location?: LocationChoice;
   digestEnabled: boolean;
+  checkpointAlertsEnabled: boolean;
   email?: string;
   firstInsight?: InsightCard | null;
   updatedAt: string;
@@ -71,11 +72,13 @@ const DEFAULT_STATE: OnboardingState = {
   status: "account_created",
   step: 0,
   digestEnabled: true,
+  checkpointAlertsEnabled: true,
   updatedAt: new Date().toISOString(),
 };
 
 const steps = [
   { id: "connect", label: "Connect a location", eta: "~1 min" },
+  { id: "checkpoint", label: "Create the checkpoint", eta: "~1 min" },
   { id: "warmup", label: "Data warm-up", eta: "~1-2 min" },
   { id: "insight", label: "First insight", eta: "instant" },
   { id: "value", label: "Weekly value loop", eta: "~1 min" },
@@ -116,6 +119,22 @@ function extractPlaceId(input: string): string | null {
   return null;
 }
 
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function isUuid(value: string | null | undefined) {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
 function nextMondayLabel() {
   const now = new Date();
   const day = now.getDay();
@@ -152,6 +171,11 @@ export default function OnboardingPage() {
     lastSyncLabel?: string;
     reviewCount?: number;
   }>({ status: "idle" });
+  const [feedbackSlug, setFeedbackSlug] = useState("");
+  const [feedbackNotifyEmail, setFeedbackNotifyEmail] = useState("");
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const [warmupSteps, setWarmupSteps] = useState<WarmupStep[]>([
     { id: "reviews", label: "Analyzing recent reviews", status: "pending" },
@@ -266,6 +290,35 @@ export default function OnboardingPage() {
     void loadGbpStatus();
   }, [cafeId]);
 
+  useEffect(() => {
+    async function loadFeedbackConfig() {
+      if (!cafeId || !isUuid(cafeId)) return;
+      const { data } = await supabase
+        .from("feedback_gate_configs")
+        .select("slug,notify_email,business_name")
+        .eq("cafe_id", cafeId)
+        .maybeSingle();
+
+      if (data?.slug) {
+        setFeedbackSlug(data.slug);
+        setFeedbackSaved(true);
+      } else if (state.location?.name && !feedbackSlug) {
+        setFeedbackSlug(slugify(state.location.name));
+      }
+
+      if (data?.notify_email) {
+        setFeedbackNotifyEmail(data.notify_email);
+        updateState({ checkpointAlertsEnabled: true });
+      } else if (data && data.notify_email === null) {
+        updateState({ checkpointAlertsEnabled: false });
+      } else if (state.email && !feedbackNotifyEmail) {
+        setFeedbackNotifyEmail(state.email);
+      }
+    }
+
+    void loadFeedbackConfig();
+  }, [cafeId, state.location?.name, state.email]);
+
   const stepIndex = Math.min(Math.max(state.step, 0), steps.length - 1);
 
   const warmupComplete = warmupSteps.every(
@@ -324,6 +377,9 @@ export default function OnboardingPage() {
       setGbpLocations(locations);
       if (locations.length === 0) {
         setLocationError("No GBP locations found for this Google account.");
+        if (!state.location?.placeId) {
+          updateState({ status: "account_created", step: 0, location: undefined });
+        }
       }
       if (locations.length === 1) {
         setSelectedGbpName(locations[0].name);
@@ -529,6 +585,65 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleSaveFeedbackGate() {
+    if (!cafeId) return;
+    if (!feedbackSlug.trim()) {
+      setFeedbackError("Add a checkpoint link first.");
+      return;
+    }
+    if (!isUuid(cafeId)) {
+      setFeedbackSaved(true);
+      updateState({ step: Math.max(state.step, 2) });
+      return;
+    }
+    setFeedbackSaving(true);
+    setFeedbackError(null);
+    setFeedbackSaved(false);
+
+    const placeId = state.location?.placeId;
+    const feedbackBase =
+      process.env.NEXT_PUBLIC_FEEDBACK_BASE_URL ?? "";
+    const gateUrl = feedbackBase
+      ? `${feedbackBase}/r/${feedbackSlug.trim()}`
+      : "";
+    const googleReviewUrl = placeId
+      ? `https://search.google.com/local/writereview?placeid=${placeId}`
+      : "";
+
+    const payload = {
+      cafe_id: cafeId,
+      business_name: state.location?.name ?? "Your cafe",
+      slug: feedbackSlug.trim(),
+      google_review_url: googleReviewUrl,
+      notify_email: feedbackNotifyEmail.trim() || null,
+      threshold: 4,
+      active: true,
+    };
+
+    const { data: existing } = await supabase
+      .from("feedback_gate_configs")
+      .select("id")
+      .eq("cafe_id", cafeId)
+      .maybeSingle();
+
+    const { error } = existing
+      ? await supabase
+          .from("feedback_gate_configs")
+          .update(payload)
+          .eq("cafe_id", cafeId)
+      : await supabase.from("feedback_gate_configs").insert(payload);
+
+    if (error) {
+      setFeedbackError("Could not save feedback gate.");
+      setFeedbackSaving(false);
+      return;
+    }
+
+    setFeedbackSaved(true);
+    setFeedbackSaving(false);
+    updateState({ step: Math.max(state.step, 2) });
+  }
+
   function updateWarmup(id: WarmupStep["id"], patch: Partial<WarmupStep>) {
     setWarmupSteps((prev) =>
       prev.map((step) => (step.id === id ? { ...step, ...patch } : step))
@@ -542,7 +657,7 @@ export default function OnboardingPage() {
       updateWarmup("insights", { status: "done", detail: null });
       updateState({
         status: "first_insight_ready",
-        step: 2,
+        step: 3,
         firstInsight: {
           title: "Nearby cafes are rated 0.3 stars higher than you",
           why: "This often affects first-time customer choice on Google.",
@@ -610,21 +725,40 @@ export default function OnboardingPage() {
 
     updateState({
       status: "first_insight_ready",
-      step: 2,
+      step: 3,
       firstInsight,
     });
   }
 
   function handleContinueFromInsight() {
-    updateState({ step: 3 });
+    updateState({ step: 4 });
   }
 
   function handleConfirmValueLoop() {
-    updateState({ status: "digest_confirmed", step: 4 });
+    updateState({ status: "digest_confirmed", step: 5 });
   }
 
-  function handleConfirmPreferences() {
-    updateState({ status: "preferences_set", step: 5 });
+  async function handleConfirmPreferences() {
+    if (cafeId) {
+      const notifyEmail = state.checkpointAlertsEnabled
+        ? (feedbackNotifyEmail.trim() || state.email || null)
+        : null;
+      const { data: existing } = await supabase
+        .from("feedback_gate_configs")
+        .select("cafe_id")
+        .eq("cafe_id", cafeId)
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("feedback_gate_configs")
+          .update({ notify_email: notifyEmail })
+          .eq("cafe_id", cafeId);
+      }
+      if (notifyEmail && notifyEmail !== feedbackNotifyEmail) {
+        setFeedbackNotifyEmail(notifyEmail);
+      }
+    }
+    updateState({ status: "preferences_set", step: 6 });
   }
 
   function handleLaunch() {
@@ -941,6 +1075,7 @@ export default function OnboardingPage() {
                         )}
                     </div>
                   )}
+
                 </div>
               )}
 
@@ -949,6 +1084,102 @@ export default function OnboardingPage() {
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
                       Step 2
+                    </p>
+                    <h2 className="text-2xl font-semibold">Create the checkpoint.</h2>
+                    <p className="text-sm text-[#94A3B8]">
+                      This is the private feedback link customers scan in-store.
+                    </p>
+                  </div>
+
+                  {!state.location?.placeId && (
+                    <div className="rounded-2xl border border-[#E2E8F0] bg-[#F9FBFC] px-4 py-3 text-xs text-[#94A3B8]">
+                      Connect your location first to generate a checkpoint link.
+                    </div>
+                  )}
+
+                  {state.location?.placeId && (
+                    <div className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-4 text-xs text-[#94A3B8]">
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+                          Feedback checkpoint
+                        </p>
+                        <h3 className="text-sm font-semibold text-[#0B1220]">
+                          Set up your feedback gate
+                        </h3>
+                        <p className="text-xs text-[#94A3B8]">
+                          This creates the QR link customers scan in-store.
+                        </p>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-[#94A3B8]">
+                            Checkpoint link
+                          </label>
+                          <input
+                            value={feedbackSlug}
+                            onChange={(e) => setFeedbackSlug(e.target.value)}
+                            placeholder="e.g. nine-grams"
+                            className="mt-2 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#0B1220] outline-none focus:border-[#22C3A6]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-[#94A3B8]">
+                            Notify email (optional)
+                          </label>
+                          <input
+                            value={feedbackNotifyEmail}
+                            onChange={(e) => setFeedbackNotifyEmail(e.target.value)}
+                            placeholder="owner@cafe.com"
+                            className="mt-2 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#0B1220] outline-none focus:border-[#22C3A6]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-[#E2E8F0] bg-[#F9FBFC] px-3 py-2 text-[11px] text-[#94A3B8]">
+                        Gate URL:{" "}
+                        <span className="font-semibold text-[#0B1220]">
+                          {process.env.NEXT_PUBLIC_FEEDBACK_BASE_URL
+                            ? `${process.env.NEXT_PUBLIC_FEEDBACK_BASE_URL}/r/${feedbackSlug || "your-link"}`
+                            : `/r/${feedbackSlug || "your-link"}`}
+                        </span>
+                      </div>
+
+                      {feedbackError && (
+                        <p className="mt-2 text-xs text-[#EF4444]">{feedbackError}</p>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveFeedbackGate}
+                          disabled={feedbackSaving || !feedbackSlug.trim()}
+                          className="rounded-full bg-[#22C3A6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#17A98F] disabled:opacity-50"
+                        >
+                          {feedbackSaving
+                            ? "Saving..."
+                            : feedbackSaved
+                              ? "Saved"
+                              : "Save checkpoint"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateState({ step: 2 })}
+                          className="rounded-full border border-[#E2E8F0] px-4 py-2 text-xs font-semibold text-[#94A3B8] hover:bg-[#F9FBFC]"
+                        >
+                          Setup later
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {stepIndex === 2 && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+                      Step 3
                     </p>
                     <h2 className="text-2xl font-semibold">
                       Warming up your data.
@@ -1016,7 +1247,7 @@ export default function OnboardingPage() {
                     {warmupComplete && (
                       <button
                         type="button"
-                        onClick={() => updateState({ step: 2 })}
+                        onClick={() => updateState({ step: 3 })}
                         className="rounded-full border border-[#E2E8F0] px-5 py-2 text-xs font-semibold text-[#0B1220] hover:bg-[#F9FBFC]"
                       >
                         Continue
@@ -1026,11 +1257,11 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {stepIndex === 2 && (
+              {stepIndex === 3 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
-                      Step 3
+                      Step 4
                     </p>
                     <h2 className="text-2xl font-semibold">Your first insight.</h2>
                     <p className="text-sm text-[#94A3B8]">
@@ -1088,11 +1319,11 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {stepIndex === 3 && (
+              {stepIndex === 4 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
-                      Step 4
+                      Step 5
                     </p>
                     <h2 className="text-2xl font-semibold">
                       How LocalPulse helps you every week.
@@ -1140,16 +1371,13 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {stepIndex === 4 && (
+              {stepIndex === 5 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
-                      Step 5
+                      Step 6
                     </p>
                     <h2 className="text-2xl font-semibold">Set your preferences.</h2>
-                    <p className="text-sm text-[#94A3B8]">
-                      Keep this lightweight. You can refine settings later.
-                    </p>
                   </div>
 
                   <div className="rounded-2xl border border-[#E2E8F0] bg-[#F9FBFC] p-5">
@@ -1179,10 +1407,47 @@ export default function OnboardingPage() {
                     </div>
 
                     <div className="mt-4 rounded-xl border border-[#E2E8F0] bg-white px-4 py-3 text-xs text-[#94A3B8]">
-                      Digest email: {" "}
+                      Digest email:{" "}
                       <span className="font-semibold text-[#0B1220]">
                         {state.email ?? "your email"}
                       </span>
+                    </div>
+
+                    <div className="mt-4 border-t border-dashed border-[#E2E8F0] pt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="opacity-80">
+                          <p className="text-sm font-semibold text-[#0B1220]">
+                            Checkpoint alert emails
+                          </p>
+                          <p className="text-xs text-[#94A3B8]">
+                            Get alerted when a customer leaves feedback below 4★.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateState({
+                              checkpointAlertsEnabled:
+                                !state.checkpointAlertsEnabled,
+                            })
+                          }
+                          className={clsx(
+                            "rounded-full px-4 py-1 text-xs font-semibold",
+                            state.checkpointAlertsEnabled
+                              ? "bg-[#22C3A6] text-[#0B1220]"
+                              : "bg-white text-[#0B1220] border border-[#E2E8F0]"
+                          )}
+                        >
+                          {state.checkpointAlertsEnabled ? "On" : "Off"}
+                        </button>
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-[#E2E8F0] bg-white px-4 py-3 text-xs text-[#94A3B8]">
+                        Alert email:{" "}
+                        <span className="font-semibold text-[#0B1220]">
+                          {feedbackNotifyEmail || state.email || "your email"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1196,7 +1461,7 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {stepIndex === 5 && (
+              {stepIndex === 6 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">

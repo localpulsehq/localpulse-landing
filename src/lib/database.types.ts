@@ -274,6 +274,97 @@ export type Database = {
           },
         ]
       }
+      feedback_gate_configs: {
+        Row: {
+          active: boolean | null
+          cafe_id: string
+          created_at: string | null
+          google_review_url: string
+          id: string
+          notify_email: string | null
+          slug: string
+          threshold: number
+          business_name: string
+        }
+        Insert: {
+          active?: boolean | null
+          cafe_id: string
+          created_at?: string | null
+          google_review_url: string
+          id?: string
+          notify_email?: string | null
+          slug: string
+          threshold?: number
+          business_name: string
+        }
+        Update: {
+          active?: boolean | null
+          cafe_id?: string
+          created_at?: string | null
+          google_review_url?: string
+          id?: string
+          notify_email?: string | null
+          slug?: string
+          threshold?: number
+          business_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_gate_configs_cafe_id_fkey"
+            columns: ["cafe_id"]
+            isOneToOne: true
+            referencedRelation: "cafes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_submissions: {
+        Row: {
+          business_id: string
+          contact: string | null
+          created_at: string | null
+          id: string
+          internal_note: string | null
+          message: string | null
+          meta: Json | null
+          rating: number
+          source: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          contact?: string | null
+          created_at?: string | null
+          id?: string
+          internal_note?: string | null
+          message?: string | null
+          meta?: Json | null
+          rating: number
+          source?: string | null
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          contact?: string | null
+          created_at?: string | null
+          id?: string
+          internal_note?: string | null
+          message?: string | null
+          meta?: Json | null
+          rating?: number
+          source?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_submissions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "cafes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string | null

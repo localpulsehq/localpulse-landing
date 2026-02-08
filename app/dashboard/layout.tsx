@@ -16,6 +16,7 @@ const CAFE_NAME_STORAGE_KEY = "lp:cafe_name";
 const navItems = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/reviews', label: 'Reviews' },
+  { href: '/dashboard/feedback', label: 'Feedback' },
   { href: '/dashboard/sales-analytics', label: 'Analytics' }, 
   { href: '/dashboard/sales', label: 'Sales' },
   { href: '/dashboard/settings', label: 'Settings' },

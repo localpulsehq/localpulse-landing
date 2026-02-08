@@ -8,7 +8,10 @@ export function MarketingFooter() {
           <div className="space-y-3 md:col-span-2">
             <h3 className="text-sm font-semibold">LocalPulse</h3>
             <p className="text-sm text-[#94A3B8]">
-              Local insights from customer reviews - built for independent cafes.
+              Proactive protection for your Google rating.
+            </p>
+            <p className="text-xs text-[#94A3B8]">
+              LocalPulse uses a private feedback link and does not modify or intercept Google reviews.
             </p>
             <p className="text-xs text-[#94A3B8]">(c) 2026 LocalPulse</p>
           </div>

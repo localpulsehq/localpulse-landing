@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="LocalPulse Before/After flowsheet">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b2f36"/>
+    </marker>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfcfe"/>
+      <stop offset="1" stop-color="#f3f6fb"/>
+    </linearGradient>
+
+    <filter id="pillShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+
+    <style>
+      :root{
+        --ink:#2b2f36;
+        --muted:#667085;
+        --card:#ffffff;
+        --accent:#2563eb;
+        --good:#16a34a;
+        --bad:#ef4444;
+      }
+
+      .title { font: 700 26px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; fill: var(--ink); }
+      .section { font: 700 22px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; fill: var(--ink); }
+      .small  { font: 600 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; fill: var(--muted); }
+      .text   { font: 600 16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; fill: var(--ink); }
+
+      .panel {
+        fill: rgba(255,255,255,0.6);
+        stroke: rgba(43,47,54,0.12);
+        stroke-width: 1.2;
+        rx: 18;
+      }
+
+      .node {
+        fill: var(--card);
+        stroke: rgba(43,47,54,0.18);
+        stroke-width: 1.4;
+        rx: 16;
+        filter: url(#shadow);
+      }
+
+      .nodeStrong {
+        fill: #ffffff;
+        stroke: rgba(37,99,235,0.35);
+        stroke-width: 2;
+        rx: 16;
+        filter: url(#shadow);
+      }
+
+      .nodeTiny {
+        fill: #ffffff;
+        stroke: rgba(43,47,54,0.18);
+        stroke-width: 1.4;
+        rx: 14;
+        filter: url(#shadow);
+      }
+
+      .arrowSoft {
+        stroke: rgba(43,47,54,0.55);
+        stroke-width: 2.4;
+        fill: none;
+        marker-end: url(#arrow);
+      }
+
+      .arrowGood { stroke: var(--good); stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .arrowBad  { stroke: var(--bad);  stroke-width: 3; fill: none; marker-end: url(#arrow); }
+
+      .pill {
+        fill: #ffffff;
+        stroke: rgba(43,47,54,0.12);
+        stroke-width: 1;
+        rx: 999;
+        filter: url(#pillShadow);
+      }
+
+      .pillText { font: 700 13px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="720" fill="url(#bg)"/>
+
+  <text class="title" x="60" y="60">LocalPulse Review Flow (Before → After)</text>
+  <text class="small" x="60" y="86">A simple feedback gate that routes happy customers to Google Reviews and unhappy customers to private insights.</text>
+
+  <rect class="panel" x="50" y="120" width="1100" height="210" />
+  <rect class="panel" x="50" y="370" width="1100" height="300" />
+
+  <text class="section" x="80" y="160">Before</text>
+  <text class="section" x="80" y="410">After</text>
+
+  <!-- ===== BEFORE (CENTERED & CLEAN) ===== -->
+  <g>
+    <!-- Customer -->
+    <rect class="node" x="220" y="190" width="240" height="90"/>
+    <text class="text" x="340" y="230" text-anchor="middle">Customer</text>
+    <text class="text" x="340" y="252" text-anchor="middle">Experience</text>
+
+    <!-- Google Reviews -->
+    <rect class="node" x="500" y="190" width="260" height="90"/>
+    <text class="text" x="630" y="242" text-anchor="middle">Google Reviews</text>
+
+    <!-- Cafe -->
+    <rect class="nodeTiny" x="800" y="205" width="100" height="60"/>
+    <text class="text" x="850" y="242" text-anchor="middle">Cafe</text>
+
+    <!-- Arrows -->
+    <path class="arrowSoft" d="M 460 235 C 480 235, 490 235, 500 235" />
+    <path class="arrowSoft" d="M 760 235 C 780 235, 790 235, 800 235" />
+  </g>
+
+  <!-- ===== AFTER ===== -->
+  <g>
+    <rect class="node" x="90" y="460" width="240" height="90"/>
+    <text class="text" x="210" y="500" text-anchor="middle">Customer</text>
+    <text class="text" x="210" y="522" text-anchor="middle">Experience</text>
+
+    <rect class="nodeStrong" x="420" y="460" width="220" height="90"/>
+    <text class="text" x="530" y="505" text-anchor="middle">LocalPulse</text>
+    <text class="text" x="530" y="527" text-anchor="middle">Feedback Gate</text>
+
+    <rect class="node" x="780" y="410" width="220" height="110"/>
+    <text class="text" x="890" y="468" text-anchor="middle">Google Reviews</text>
+
+    <rect class="nodeStrong" x="780" y="550" width="220" height="110"/>
+    <text class="text" x="890" y="602" text-anchor="middle">LocalPulse</text>
+    <text class="text" x="890" y="624" text-anchor="middle">Analytics &amp; Insights</text>
+
+    <rect class="nodeTiny" x="1030" y="584" width="90" height="60"/>
+    <text class="text" x="1075" y="620" text-anchor="middle">Cafe</text>
+
+    <path class="arrowSoft" d="M 330 505 C 360 505, 390 505, 420 505" />
+    <path class="arrowGood" d="M 640 495 C 690 470, 730 462, 780 468" />
+    <path class="arrowBad" d="M 530 550 C 530 610, 640 640, 780 640" />
+    <path class="arrowSoft" d="M 890 520 C 890 535, 890 540, 890 550" />
+    <path class="arrowSoft" d="M 1000 615 C 1010 615, 1020 615, 1030 615" />
+
+    <g>
+      <rect class="pill" x="670" y="438" width="72" height="26"/>
+      <text class="pillText" x="706" y="456" text-anchor="middle" fill="#16a34a">Happy</text>
+    </g>
+
+    <g>
+      <rect class="pill" x="465" y="590" width="92" height="26"/>
+      <text class="pillText" x="510" y="608" text-anchor="middle" fill="#ef4444">Unhappy</text>
+    </g>
+  </g>
+</svg>

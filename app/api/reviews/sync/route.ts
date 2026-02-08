@@ -7,6 +7,7 @@ import { getValidGoogleAccessToken } from "@/src/lib/google/gbpTokens";
 export const runtime = "nodejs";
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
+const MAX_REVIEWS_PER_SYNC = 25;
 
 
 // For Places API (New) reviews, publishTime is an ISO string.
@@ -165,7 +166,7 @@ export async function POST(_req: NextRequest) {
         usedGbp = true;
         gbpStatus = "ok";
 
-        rowsToUpsert = gbpReviews.map((r) => ({
+        rowsToUpsert = gbpReviews.slice(0, MAX_REVIEWS_PER_SYNC).map((r) => ({
           cafe_id: cafeId,
           review_source_id: source.id,
           external_review_id: makeExternalReviewIdForGbp(r),
@@ -247,7 +248,7 @@ export async function POST(_req: NextRequest) {
       typeof result?.userRatingCount === "number" ? result.userRatingCount : null;
 
     // 5) Map into our reviews table payload
-    rowsToUpsert = googleReviews.map((r) => ({
+    rowsToUpsert = googleReviews.slice(0, MAX_REVIEWS_PER_SYNC).map((r) => ({
       cafe_id: cafeId,
       review_source_id: source.id,
       external_review_id: makeExternalReviewId(r),

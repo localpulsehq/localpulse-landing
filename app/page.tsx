@@ -8,83 +8,83 @@ const proofCards: Array<{
   tone: "success" | "warn" | "error" | "info";
 }> = [
   {
-    title: "Customers love your food",
-    body: "Praise for menu quality shows up in 7 recent reviews.",
+    title: "7 unhappy customers were routed privately",
+    body: "Their feedback reached you before it reached Google.",
     tone: "success",
   },
   {
-    title: "Rated higher than nearby competitors",
-    body: "You average 4.6 stars vs nearby cafes at 4.3.",
+    title: "Your rating stayed steady this week",
+    body: "Happy guests were prompted to leave Google reviews.",
     tone: "success",
   },
   {
-    title: "Review velocity down 35%",
-    body: "Momentum slowed vs last week. Time to prompt reviews.",
+    title: "Early warning: wait time feedback rising",
+    body: "Showing up in private responses before it hits Google.",
     tone: "warn",
   },
   {
-    title: "Wait time mentioned repeatedly",
-    body: "Appears in 5 of the last 18 reviews.",
+    title: "Staffing change reduced complaints",
+    body: "Private feedback about service dropped this week.",
     tone: "error",
   },
   {
-    title: "Coffee quality is a standout",
-    body: "People mention it 9 times in recent reviews.",
+    title: "Coffee quality praise is consistent",
+    body: "A strong signal to keep prompting happy guests.",
     tone: "success",
   },
   {
-    title: "High ratings, negative themes",
-    body: "Service complaints appear despite strong ratings.",
+    title: "Weekend rush feedback needs attention",
+    body: "Patterns are appearing in private responses.",
     tone: "warn",
   },
   {
-    title: "Weekly revenue up 8%",
-    body: "Sales lift after staffing change this week.",
+    title: "Follow-up resolved 4 issues",
+    body: "Customers confirmed problems were fixed.",
     tone: "success",
   },
   {
-    title: "Afternoon sales dip",
-    body: "Slower 2-4pm trade compared to last month.",
+    title: "Afternoon service flagged early",
+    body: "Came up in private feedback before any new reviews.",
     tone: "warn",
   },
   {
-    title: "Response rate improving",
-    body: "You replied to 80% of new reviews.",
+    title: "Complaints trending down",
+    body: "Private feedback shows fewer repeat issues.",
     tone: "success",
   },
 ];
 
 const pillars = [
   {
-    title: "Review insights",
-    body: "Understand praise, complaints, and sentiment without digging through every review.",
+    title: "Review protection",
+    body: "Unhappy customers are routed to you privately before reviews go public.",
   },
   {
-    title: "Competitor benchmark",
-    body: "See how your ratings and review volume compare to nearby cafes.",
+    title: "Google rating stability",
+    body: "Happy customers are prompted to share their experience on Google.",
   },
   {
-    title: "Momentum tracking",
-    body: "Spot review velocity shifts early so you can act fast.",
+    title: "Early issue detection",
+    body: "Spot repeat complaints and fix them before they spread.",
   },
   {
-    title: "Sales trends",
-    body: "Track revenue shifts to validate what actions are working.",
+    title: "Proof & validation",
+    body: "Trends show what improved and what still needs attention.",
   },
 ];
 
 const steps = [
   {
-    title: "Connect your reviews",
-    body: "Link Google reviews in minutes. No complex setup.",
+    title: "Customer feedback checkpoint",
+    body: "Guests leave a quick star rating first.",
   },
   {
-    title: "LocalPulse analyses trends",
-    body: "We translate feedback into clear, cafe-friendly insights.",
+    title: "Smart routing",
+    body: "Happy guests go to Google; unhappy guests go to you.",
   },
   {
-    title: "Get next steps weekly",
-    body: "Stay focused on what to fix or double down on.",
+    title: "Learn & prevent repeats",
+    body: "Weekly guidance shows what to fix and what worked.",
   },
 ];
 
@@ -121,11 +121,13 @@ export default function Home() {
               <span className="mt-2 h-16 w-1.5 rounded-full bg-[#22C3A6]" aria-hidden="true" />
               <div className="space-y-4">
                 <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
-                  Know what to fix or double down on this month.
+                  Stop bad Google reviews before they happen.
                 </h1>
 
                 <p className="max-w-xl text-base text-[#94A3B8] opacity-80 md:text-lg">
-                  See what customers are praising - and what's costing you repeat visits.
+                  LocalPulse adds a private feedback checkpoint so unhappy customers
+                  reach you first, while happy customers are invited to leave a Google
+                  review.
                 </p>
               </div>
             </div>
@@ -135,13 +137,13 @@ export default function Home() {
                 href="/contact"
                 className="rounded-full bg-[#22C3A6] px-5 py-3 text-sm font-semibold tracking-[0.015em] text-[#0B1220] shadow-[0_10px_30px_rgba(34,195,166,0.35)] transition hover:bg-[#17A98F]"
               >
-                Request early access
+                Protect my rating
               </Link>
               <Link
                 href="/product"
                 className="inline-flex items-center gap-2 rounded-full border border-[#E2E8F0] bg-transparent px-5 py-3 text-sm font-semibold tracking-[0.015em] text-[#0B1220] transition hover:border-[#22C3A6] hover:text-[#17A98F]"
               >
-                View product <span aria-hidden="true">→</span>
+                See how it works <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
@@ -190,12 +192,12 @@ export default function Home() {
               What it does
             </p>
             <h2 className="mt-3 text-3xl font-semibold">
-              Practical insights, not dashboards.
+              Protection first, insights second.
             </h2>
           </div>
           <p className="max-w-lg text-sm text-[#94A3B8]">
-            LocalPulse is built for busy cafe owners. Every insight is short, specific,
-            and tied to a clear action.
+            LocalPulse creates a private checkpoint between customer emotion and
+            Google, routing feedback the right way before reviews go public.
           </p>
         </div>
 
@@ -228,12 +230,12 @@ export default function Home() {
                 Proof
               </p>
               <h2 className="mt-3 text-3xl font-semibold">
-                Insights your team can act on fast.
+                Proof the protection is working.
               </h2>
             </div>
             <p className="max-w-md text-sm text-[#94A3B8]">
-              Example insights from the LocalPulse overview. Short, clear, and
-              immediately actionable.
+              Evidence of prevented issues, early warning signals, and confirmation
+              of what improved.
             </p>
           </div>
 
@@ -261,11 +263,11 @@ export default function Home() {
               How it works
             </p>
             <h2 className="mt-3 text-3xl font-semibold">
-              Clear next steps, delivered weekly.
+              A simple checkpoint that protects your rating.
             </h2>
           </div>
           <p className="max-w-md text-sm text-[#94A3B8]">
-            You stay focused on running the cafe. We deliver the insight.
+            You stay focused on the cafe. We handle the routing and guidance.
           </p>
         </div>
 
@@ -292,11 +294,11 @@ export default function Home() {
           <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-3xl font-semibold">
-                Onboarding a small number of cafes in Melbourne and Geelong.
+                Inviting a small number of cafes to protect their rating.
               </h2>
               <p className="mt-3 max-w-xl text-sm text-[#94A3B8]">
-                Get early access and shape the LocalPulse roadmap. We will help you
-                surface insights that matter for your cafe.
+                Get early access, shape the product, and put a calm checkpoint
+                between customer emotion and Google.
               </p>
             </div>
             <div className="flex gap-3">
@@ -304,7 +306,7 @@ export default function Home() {
                 href="/contact"
                 className="flex items-center justify-center rounded-full bg-[#22C3A6] px-6 py-3 text-sm font-semibold text-[#0B1220] shadow-[0_10px_30px_rgba(34,195,166,0.35)] transition hover:bg-[#17A98F]"
               >
-                Apply for Melbourne pilot
+                Apply for early access
               </Link>
               <Link
                 href="/pricing"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import AnimatedCard from "@/components/ui/AnimatedCard";
 
 type InsightCard = {
@@ -9,6 +10,8 @@ type InsightCard = {
   severity: "info" | "warn" | "error" | "success";
   why: string;
   action?: string[];
+  examples?: string[];
+  link?: string;
 };
 
 function pillStyle(kind: InsightCard["kind"], sev: InsightCard["severity"]) {
@@ -51,6 +54,12 @@ function toneForCard(card: InsightCard): Tone {
       return "neutral";
     case "no_reviews":
       return "neutral";
+    case "feedback_routed":
+      return "attention";
+    case "feedback_top_issue":
+      return "attention";
+    case "feedback_resolved_vs_new":
+      return "positive";
     default:
       return card.kind === "opportunity" ? "positive" : "neutral";
   }
@@ -124,6 +133,9 @@ export function InsightCards({
   if (!cards?.length) return null;
 
   const signalOrder = [
+    "feedback_routed",
+    "feedback_top_issue",
+    "feedback_resolved_vs_new",
     "rating_gap",
     "reviews_summary",
     "low_review_volume",
@@ -157,7 +169,16 @@ export function InsightCards({
         className={toneClass(tone)}
       >
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-[#0B1220]">{card.title}</p>
+          {card.link ? (
+            <Link
+              href={card.link}
+              className="text-sm font-semibold text-[#0B1220] hover:text-[#17A98F]"
+            >
+              {card.title}
+            </Link>
+          ) : (
+            <p className="text-sm font-semibold text-[#0B1220]">{card.title}</p>
+          )}
           <div className="flex items-center gap-2">
             {reason && (
               <button
@@ -182,12 +203,34 @@ export function InsightCards({
 
         <p className="mt-2 text-xs text-[#94A3B8] leading-relaxed">{card.why}</p>
 
+        {card.examples?.length ? (
+          <ul className="mt-3 space-y-1 text-xs text-[#0B1220]">
+            {card.examples.slice(0, 2).map((ex, i) => (
+              <li
+                key={i}
+                className="rounded-lg border border-white/40 bg-white/0 px-2 py-1 text-[11px] text-[#0B1220]"
+              >
+                “{ex}”
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         {card.action?.length ? (
           <ul className="mt-3 space-y-1 text-xs text-[#94A3B8] list-disc list-inside">
             {card.action.slice(0, 3).map((a, i) => (
               <li key={i}>{a}</li>
             ))}
           </ul>
+        ) : null}
+
+        {card.link ? (
+          <Link
+            href={card.link}
+            className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+          >
+            Open
+          </Link>
         ) : null}
       </AnimatedCard>
     );
@@ -208,7 +251,7 @@ export function InsightCards({
             Signals
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6">
-            {signals.slice(0, 3).map(renderCard)}
+            {signals.slice(0, 6).map(renderCard)}
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import AnimatedCard, {
   AnimatedCardGroup,
 } from '@/components/ui/AnimatedCard';
@@ -72,6 +73,39 @@ function confidenceFromCount(
   return "low";
 }
 
+const ISSUE_THEMES: Array<{ label: string; terms: string[] }> = [
+  { label: "wait time", terms: ["wait", "waiting", "queue", "line"] },
+  { label: "service", terms: ["service", "staff", "rude", "attitude"] },
+  { label: "order accuracy", terms: ["wrong", "incorrect", "missing", "forgot"] },
+  { label: "coffee quality", terms: ["coffee", "espresso", "latte", "taste"] },
+  { label: "cleanliness", terms: ["clean", "dirty", "mess", "table"] },
+  { label: "noise", terms: ["noise", "loud", "music"] },
+];
+
+function matchTheme(text: string, label: string) {
+  const theme = ISSUE_THEMES.find((t) => t.label === label);
+  if (!theme) return false;
+  return theme.terms.some((term) => text.includes(term));
+}
+
+function deriveTopIssue(messages: Array<string | null>) {
+  const counts = new Map<string, number>();
+  for (const msg of messages) {
+    const text = (msg ?? "").toLowerCase();
+    if (!text) continue;
+    for (const theme of ISSUE_THEMES) {
+      if (theme.terms.some((term) => text.includes(term))) {
+        counts.set(theme.label, (counts.get(theme.label) ?? 0) + 1);
+      }
+    }
+  }
+  if (counts.size === 0) return null;
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const top = sorted[0];
+  if (!top) return null;
+  return { label: top[0], count: top[1] };
+}
+
 // Simple sparkline SVG (same as before)
 function RevenueSparkline({ values }: { values: number[] }) {
   if (!values.length) return null;
@@ -138,6 +172,8 @@ type InsightCard = {
   severity: "info" | "warn" | "error" | "success";
   why: string;
   action?: string[];
+  examples?: string[];
+  link?: string;
 };
 
 type ReviewVelocity = {
@@ -293,6 +329,25 @@ export default function DashboardOverviewPage() {
   const [insightCards, setInsightCards] = useState<InsightCard[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [feedbackConfigured, setFeedbackConfigured] = useState(false);
+  const [feedbackVelocity30, setFeedbackVelocity30] = useState<{
+    last30: number;
+    prev30: number;
+  } | null>(null);
+  const [feedbackStats, setFeedbackStats] = useState<{
+    unhappy7: number;
+    happy7: number;
+    topIssue: string | null;
+    topIssueCount: number;
+    acknowledged7: number;
+    resolved7: number;
+    new7: number;
+    avgRating7: number;
+    resolutionRate: number | null;
+    earlyWarning: string;
+    routedExamples: string[];
+    topIssueExamples: string[];
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -324,6 +379,112 @@ export default function DashboardOverviewPage() {
 
       const cafeId = cafe.id;
 
+      const { data: gate } = await supabase
+        .from("feedback_gate_configs")
+        .select("threshold")
+        .eq("cafe_id", cafeId)
+        .maybeSingle();
+
+      if (gate) {
+        setFeedbackConfigured(true);
+        const threshold = typeof gate.threshold === "number" ? gate.threshold : 4;
+        const since = new Date();
+        since.setDate(since.getDate() - 7);
+        const since60 = new Date();
+        since60.setDate(since60.getDate() - 60);
+
+        const { data: feedbackRows } = await supabase
+          .from("feedback_submissions")
+          .select("rating,message,created_at,status")
+          .eq("business_id", cafeId)
+          .gte("created_at", since.toISOString());
+
+        const rows = (feedbackRows ?? []) as Array<{
+          rating: number;
+          message: string | null;
+          created_at: string | null;
+          status: string | null;
+        }>;
+
+        const unhappy = rows.filter((r) => r.rating < threshold);
+        const happy = rows.filter((r) => r.rating >= threshold);
+
+        const acknowledged = rows.filter((r) => r.status === "acknowledged").length;
+        const resolved = rows.filter((r) => r.status === "resolved").length;
+        const newlyLogged = rows.filter((r) => r.status === "new").length;
+        const avgRating7 =
+          rows.length > 0
+            ? rows.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rows.length
+            : 0;
+        const totalTracked = resolved + newlyLogged;
+        const resolutionRate =
+          totalTracked > 0 ? Math.round((resolved / totalTracked) * 100) : null;
+
+        const topIssueResult = deriveTopIssue(unhappy.map((r) => r.message));
+        const topIssue = topIssueResult?.label ?? null;
+        const topIssueCount = topIssueResult?.count ?? 0;
+        const routedExamples = unhappy
+          .map((r) => (r.message ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 2);
+
+        const topIssueExamples =
+          topIssue && topIssueCount > 0
+            ? unhappy
+                .map((r) => (r.message ?? "").trim())
+                .filter((msg) => msg && matchTheme(msg.toLowerCase(), topIssue))
+                .slice(0, 2)
+            : [];
+
+        const earlyWarning =
+          topIssue && topIssueCount >= 3
+            ? `Repeat complaints about ${topIssue} this week.`
+            : unhappy.length > 0
+              ? "New private feedback this week - review and respond quickly."
+              : "No repeat issues detected in the last 7 days.";
+
+        if (!cancelled) {
+          setFeedbackStats({
+            unhappy7: unhappy.length,
+            happy7: happy.length,
+            topIssue,
+            topIssueCount,
+            acknowledged7: acknowledged,
+            resolved7: resolved,
+            new7: newlyLogged,
+            avgRating7,
+            resolutionRate,
+            earlyWarning,
+            routedExamples,
+            topIssueExamples,
+          });
+        }
+
+        const { data: feedback60 } = await supabase
+          .from("feedback_submissions")
+          .select("created_at")
+          .eq("business_id", cafeId)
+          .gte("created_at", since60.toISOString());
+
+        const fbRows = (feedback60 ?? []) as Array<{ created_at: string | null }>;
+        const now = new Date();
+        const cutoff30 = new Date();
+        cutoff30.setDate(cutoff30.getDate() - 30);
+        const last30 = fbRows.filter((r) => {
+          if (!r.created_at) return false;
+          return new Date(r.created_at) >= cutoff30;
+        }).length;
+        const prev30 = fbRows.length - last30;
+
+        if (!cancelled) {
+          setFeedbackVelocity30({ last30, prev30 });
+        }
+      } else {
+        setFeedbackConfigured(false);
+        setFeedbackStats(null);
+        setFeedbackVelocity30(null);
+      }
+
       // Load insights
       setInsightsLoading(true);
       try {
@@ -342,8 +503,23 @@ export default function DashboardOverviewPage() {
           ? json.insightCards
           : [];
 
+        const reviewLinkedIds = new Set([
+          "reviews_summary",
+          "low_review_volume",
+          "velocity_drop",
+          "rating_sentiment_mismatch",
+          "recurring_complaint",
+          "no_reviews",
+        ]);
+        const linkedCards = cards.map((card: InsightCard) => {
+          if (reviewLinkedIds.has(card.id)) {
+            return { ...card, link: "/dashboard/reviews" };
+          }
+          return card;
+        });
+
         if (!cancelled) {
-          setInsightCards(cards);
+          setInsightCards(linkedCards);
           setReviewSummary(
             json?.reviews && typeof json.reviews.total === "number"
               ? (json.reviews as ReviewSummary)
@@ -463,8 +639,17 @@ export default function DashboardOverviewPage() {
     // ---------- main content ----------
   const hasReviewData = Boolean(reviewSummary?.total);
   const reviewVelocity = reviewSummary?.reviewVelocity ?? null;
-  const reviewCount30 = reviewVelocity?.last30 ?? reviewSummary?.total ?? 0;
-  const reviewDelta30 = reviewVelocity?.delta30Pct ?? null;
+  const reviewsLast30 = reviewVelocity?.last30 ?? reviewSummary?.total ?? 0;
+  const reviewsPrev30 = reviewVelocity?.prev30 ?? 0;
+  const feedbackLast30 = feedbackVelocity30?.last30 ?? 0;
+  const feedbackPrev30 = feedbackVelocity30?.prev30 ?? 0;
+  const reviewCount30 = reviewsLast30 + feedbackLast30;
+  const reviewDelta30 =
+    reviewsPrev30 + feedbackPrev30 > 0
+      ? ((reviewCount30 - (reviewsPrev30 + feedbackPrev30)) /
+          (reviewsPrev30 + feedbackPrev30)) *
+        100
+      : null;
   const reviewConfidence = confidenceFromCount(
     reviewSummary?.total ?? 0,
     10,
@@ -477,7 +662,11 @@ export default function DashboardOverviewPage() {
   const revenueConfidence = confidenceFromCount(revenueCoverage, 10, 20);
   const sparklineHasData = sparklineValues.some((value) => value > 0);
 
-  const hasAnyData = hasReviewData || hasRevenueData || revenueCoverage > 0;
+  const hasFeedbackData =
+    feedbackConfigured &&
+    ((feedbackStats?.unhappy7 ?? 0) > 0 || (feedbackStats?.happy7 ?? 0) > 0);
+  const hasAnyData =
+    hasReviewData || hasRevenueData || revenueCoverage > 0 || hasFeedbackData;
   const anyLowConfidence =
     (hasReviewData && reviewConfidence === "low") ||
     (hasReviewData && velocityConfidence === "low") ||
@@ -572,7 +761,48 @@ export default function DashboardOverviewPage() {
     .filter((item, index) => focusSource.indexOf(item) === index)
     .slice(0, anyLowConfidence ? 2 : 3);
 
-  const showInsights = (insightsLoading || insightCards.length > 0) && hasAnyData;
+  const feedbackInsightCards: InsightCard[] =
+    feedbackConfigured && feedbackStats
+      ? [
+          {
+            id: "feedback_routed",
+            title: `${feedbackStats.unhappy7} unhappy customers were routed privately`,
+            kind: "signal",
+            severity: feedbackStats.unhappy7 > 0 ? "warn" : "success",
+            why:
+              feedbackStats.unhappy7 > 0
+                ? "Their feedback reached you before Google."
+                : "No unhappy feedback detected in the last 7 days.",
+            action: ["View private feedback"],
+            examples: feedbackStats.unhappy7 > 0 ? feedbackStats.routedExamples : [],
+            link: "/dashboard/feedback",
+          },
+          {
+            id: "feedback_top_issue",
+            title: "Most common issue this week",
+            kind: "signal",
+            severity: feedbackStats.topIssue ? "warn" : "info",
+            why: feedbackStats.topIssue
+              ? `${feedbackStats.topIssue} mentioned ${feedbackStats.topIssueCount} times.`
+              : "No clear pattern yet.",
+            action: ["View related feedback"],
+            examples: feedbackStats.topIssueExamples,
+          },
+          {
+            id: "feedback_resolved_vs_new",
+            title: "Resolved issues vs new complaints",
+            kind: "signal",
+            severity: feedbackStats.new7 > 0 ? "warn" : "success",
+            why: `${feedbackStats.resolved7} resolved · ${feedbackStats.new7} new this week.`,
+            action: ["View status breakdown"],
+            link: "/dashboard/feedback",
+          },
+        ]
+      : [];
+
+  const combinedInsightCards = [...feedbackInsightCards, ...insightCards];
+  const showInsights =
+    (insightsLoading || combinedInsightCards.length > 0) && hasAnyData;
 
   return (
     <section className="space-y-8">
@@ -646,8 +876,92 @@ export default function DashboardOverviewPage() {
                   </div>
                 )}
                 <p className="mt-2 text-[11px] text-[#94A3B8]">
-                  {confidenceLabel(velocityConfidence)}
+                  {confidenceLabel(velocityConfidence)} · includes private feedback
                 </p>
+              </AnimatedCard>
+            )}
+
+            {feedbackConfigured && feedbackStats && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Unhappy guests routed privately (7 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {feedbackStats.unhappy7}
+                </p>
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  Private feedback captured before Google.
+                </p>
+                <Link
+                  href="/dashboard/feedback"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  Open feedback inbox
+                </Link>
+              </AnimatedCard>
+            )}
+
+            {feedbackConfigured && feedbackStats && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Happy guests sent to Google (7 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {feedbackStats.happy7}
+                </p>
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  Based on 4-5 star check-ins.
+                </p>
+                <Link
+                  href="/dashboard/feedback"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  View gate stats
+                </Link>
+              </AnimatedCard>
+            )}
+
+            {feedbackConfigured && feedbackStats && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Feedback rating (last 7 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {feedbackStats.avgRating7
+                    ? feedbackStats.avgRating7.toFixed(1)
+                    : "0.0"}
+                </p>
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  Average from gate check-ins.
+                </p>
+                <Link
+                  href="/dashboard/feedback"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  View feedback
+                </Link>
+              </AnimatedCard>
+            )}
+
+            {feedbackConfigured && feedbackStats && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Resolution rate (7 days)
+                </p>
+                <p className="text-2xl font-semibold text-[#0B1220]">
+                  {feedbackStats.resolutionRate != null
+                    ? `${feedbackStats.resolutionRate}%`
+                    : "—"}
+                </p>
+                <p className="mt-2 text-[11px] text-[#94A3B8]">
+                  Resolved vs new complaints.
+                </p>
+                <Link
+                  href="/dashboard/feedback"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  Open feedback inbox
+                </Link>
               </AnimatedCard>
             )}
 
@@ -678,6 +992,12 @@ export default function DashboardOverviewPage() {
                 <p className="mt-2 text-[11px] text-[#94A3B8]">
                   {confidenceLabel(revenueConfidence)}
                 </p>
+                <Link
+                  href="/dashboard/sales-analytics"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  Open analytics
+                </Link>
               </AnimatedCard>
             )}
 
@@ -705,12 +1025,76 @@ export default function DashboardOverviewPage() {
                 </p>
               </AnimatedCard>
             )}
+
+            {!feedbackConfigured && hasAnyData && (
+              <AnimatedCard variant="scale" glass>
+                <p className="text-xs font-medium text-[#94A3B8] mb-1">
+                  Feedback gate not set up
+                </p>
+                <p className="text-sm text-[#94A3B8]">
+                  Add your gate link to start capturing private feedback.
+                </p>
+                <Link
+                  href="/dashboard/feedback"
+                  className="mt-3 inline-flex text-xs font-semibold text-[#22C3A6]"
+                >
+                  Set up feedback gate
+                </Link>
+              </AnimatedCard>
+            )}
           </AnimatedCardGroup>
         </div>
       </section>
 
+      {feedbackConfigured && feedbackStats && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#0B1220]">
+              Feedback health (last 7 days)
+            </h3>
+            <Link
+              href="/dashboard/feedback"
+              className="text-xs font-semibold text-[#22C3A6]"
+            >
+              Open inbox
+            </Link>
+          </div>
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl bg-[#F9FBFC] px-3 py-2">
+                <p className="text-[11px] text-[#94A3B8]">
+                  Routed privately
+                </p>
+                <p className="text-lg font-semibold text-[#0B1220]">
+                  {feedbackStats.unhappy7}
+                </p>
+              </div>
+              <div className="rounded-xl bg-[#F9FBFC] px-3 py-2">
+                <p className="text-[11px] text-[#94A3B8]">
+                  Acknowledged / Resolved
+                </p>
+                <p className="text-lg font-semibold text-[#0B1220]">
+                  {feedbackStats.acknowledged7} / {feedbackStats.resolved7}
+                </p>
+              </div>
+              <div className="rounded-xl bg-[#F9FBFC] px-3 py-2">
+                <p className="text-[11px] text-[#94A3B8]">
+                  Most common issue
+                </p>
+                <p className="text-sm font-semibold text-[#0B1220]">
+                  {feedbackStats.topIssue ?? "None yet"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-[#E2E8F0] bg-[#F9FBFC] px-3 py-2 text-xs text-[#64748B]">
+              Early warning: {feedbackStats.earlyWarning}
+            </div>
+          </div>
+        </section>
+      )}
+
       {showInsights && (
-        <InsightCards loading={insightsLoading} cards={insightCards} />
+        <InsightCards loading={insightsLoading} cards={combinedInsightCards} />
       )}
 
       {hasAnyData && (
