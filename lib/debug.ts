@@ -9,4 +9,5 @@
  *   - Pages that import this can conditionally render debug info
  */
 export const ENABLE_ANALYTICS_DEBUG =
+  process.env.NODE_ENV !== 'production' &&
   process.env.NEXT_PUBLIC_ANALYTICS_DEBUG === '1';
