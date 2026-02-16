@@ -62,6 +62,7 @@ type WarmupStep = {
 };
 
 const STORAGE_KEY = "lp:onboarding:v1";
+const STORAGE_USER_KEY = "lp:onboarding:user";
 const DEV_ONBOARDING_BYPASS =
   process.env.NEXT_PUBLIC_DEV_ONBOARDING_BYPASS === "1";
 const DEV_ONBOARDING_EMAIL =
@@ -218,6 +219,16 @@ export default function OnboardingPage() {
       }
 
       const user = userData.user;
+
+      if (typeof window !== "undefined") {
+        const storedUserId = window.localStorage.getItem(STORAGE_USER_KEY);
+        if (storedUserId && storedUserId !== user.id) {
+          window.localStorage.removeItem(STORAGE_KEY);
+          window.localStorage.removeItem(ONBOARDING_CHECKLIST_DISMISS_KEY);
+          setState(DEFAULT_STATE);
+        }
+        window.localStorage.setItem(STORAGE_USER_KEY, user.id);
+      }
 
       if (!state.email && user.email) {
         setState((prev) => ({ ...prev, email: user.email ?? undefined }));
