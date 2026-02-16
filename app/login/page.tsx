@@ -23,7 +23,15 @@ function LoginPageInner() {
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              onboarding_complete: false,
+            },
+          },
+        });
 
         if (error) {
           setMessage(error.message);
@@ -56,10 +64,45 @@ function LoginPageInner() {
         .eq("owner_id", user.id)
         .maybeSingle();
 
-      if (!cafe) {
-        router.push("/onboarding");
-        router.refresh();
-        return;
+      const onboardingComplete =
+        user.user_metadata?.onboarding_complete === true;
+
+      if (!onboardingComplete) {
+        if (!cafe) {
+          router.push("/onboarding");
+          router.refresh();
+          return;
+        }
+
+        const [{ data: reviewSource }, { data: feedbackGate }] = await Promise.all(
+          [
+            supabase
+              .from("review_sources")
+              .select("id")
+              .eq("cafe_id", cafe.id)
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from("feedback_gate_configs")
+              .select("id")
+              .eq("cafe_id", cafe.id)
+              .limit(1)
+              .maybeSingle(),
+          ]
+        );
+
+        const hasOnboardingSignals = Boolean(reviewSource || feedbackGate);
+        if (!hasOnboardingSignals) {
+          router.push("/onboarding");
+          router.refresh();
+          return;
+        }
+
+        if (user.user_metadata?.onboarding_complete !== true) {
+          await supabase.auth.updateUser({
+            data: { onboarding_complete: true },
+          });
+        }
       }
 
       router.push(nextParam || "/dashboard");

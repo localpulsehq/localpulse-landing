@@ -52,7 +52,7 @@ function DashboardLayoutInner({
 
       const { data: cafeData, error: cafeError } = await supabase
         .from('cafes')
-        .select('name')
+        .select('id,name')
         .eq('owner_id', user.id)
         .maybeSingle();
 
@@ -64,6 +64,39 @@ function DashboardLayoutInner({
       } else {
         router.push("/onboarding");
         return;
+      }
+
+      const onboardingComplete =
+        user.user_metadata?.onboarding_complete === true;
+      if (!onboardingComplete) {
+        const [{ data: reviewSource }, { data: feedbackGate }] = await Promise.all(
+          [
+            supabase
+              .from("review_sources")
+              .select("id")
+              .eq("cafe_id", cafeData?.id)
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from("feedback_gate_configs")
+              .select("id")
+              .eq("cafe_id", cafeData?.id)
+              .limit(1)
+              .maybeSingle(),
+          ]
+        );
+
+        const hasOnboardingSignals = Boolean(reviewSource || feedbackGate);
+        if (!hasOnboardingSignals) {
+          router.push("/onboarding");
+          return;
+        }
+
+        if (user.user_metadata?.onboarding_complete !== true) {
+          await supabase.auth.updateUser({
+            data: { onboarding_complete: true },
+          });
+        }
       }
 
       setLoading(false);

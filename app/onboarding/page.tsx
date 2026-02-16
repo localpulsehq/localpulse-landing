@@ -761,8 +761,11 @@ export default function OnboardingPage() {
     updateState({ status: "preferences_set", step: 6 });
   }
 
-  function handleLaunch() {
+  async function handleLaunch() {
     updateState({ status: "onboarding_complete" });
+    await supabase.auth.updateUser({
+      data: { onboarding_complete: true },
+    });
     router.push("/dashboard");
   }
 
