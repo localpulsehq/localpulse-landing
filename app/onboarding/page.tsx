@@ -63,6 +63,7 @@ type WarmupStep = {
 
 const STORAGE_KEY = "lp:onboarding:v1";
 const STORAGE_USER_KEY = "lp:onboarding:user";
+const ONBOARDING_CHECKLIST_DISMISS_KEY = "lp:onboarding:checklist_dismissed";
 const DEV_ONBOARDING_BYPASS =
   process.env.NEXT_PUBLIC_DEV_ONBOARDING_BYPASS === "1";
 const DEV_ONBOARDING_EMAIL =
