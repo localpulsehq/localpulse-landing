@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
@@ -10,48 +10,62 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams?.get("next");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (isSubmitting) return;
     setMessage(null);
+    setIsSubmitting(true);
 
-    if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({ email, password });
+    try {
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({ email, password });
 
+        if (error) {
+          setMessage(error.message);
+          return;
+        }
+
+        setMessage("Check your email to confirm your account");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setMessage("Check your email to confirm your account");
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      setMessage(error.message);
-    } else {
-      const user = data?.user;
-      if (user) {
-        const { data: cafe } = await supabase
-          .from("cafes")
-          .select("id")
-          .eq("owner_id", user.id)
-          .maybeSingle();
-
-        if (!cafe) {
-          router.push("/onboarding");
-          router.refresh();
-          return;
-        }
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        setMessage("We couldn't verify your account. Please try again.");
+        return;
       }
 
-      router.push("/dashboard");
+      const user = userData.user;
+      const { data: cafe } = await supabase
+        .from("cafes")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+
+      if (!cafe) {
+        router.push("/onboarding");
+        router.refresh();
+        return;
+      }
+
+      router.push(nextParam || "/dashboard");
       router.refresh();
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -159,15 +173,29 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                className="w-full rounded-full bg-[#22C3A6] px-4 py-2 text-sm font-semibold text-[#0B1220] shadow-[0_10px_30px_rgba(34,195,166,0.3)] transition hover:bg-[#17A98F]"
+                className="w-full rounded-full bg-[#22C3A6] px-4 py-2 text-sm font-semibold text-[#0B1220] shadow-[0_10px_30px_rgba(34,195,166,0.3)] transition hover:bg-[#17A98F] disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isSubmitting}
+                aria-busy={isSubmitting}
               >
-                {mode === "signin" ? "Sign In" : "Sign Up"}
+                <span className="inline-flex items-center justify-center gap-2">
+                  {isSubmitting && (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0B1220] border-t-transparent" />
+                  )}
+                  {mode === "signin"
+                    ? isSubmitting
+                      ? "Signing in..."
+                      : "Sign In"
+                    : isSubmitting
+                    ? "Creating account..."
+                    : "Sign Up"}
+                </span>
               </button>
             </form>
 
             <button
-              className="mt-5 w-full text-xs text-[#94A3B8] hover:text-[#0B1220]"
+              className="mt-5 w-full text-xs text-[#94A3B8] hover:text-[#0B1220] disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+              disabled={isSubmitting}
             >
               {mode === "signin"
                 ? "Don't have an account? Sign up"
